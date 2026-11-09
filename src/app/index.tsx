@@ -32,13 +32,14 @@ export default function HomeScreen() {
     }
   };
 
-  // Runs every time we return to Home
+  // Reload expenses every time we return to Home
   useFocusEffect(
     useCallback(() => {
       loadExpenses();
     }, [])
   );
 
+  // Calculate current month's total
   const monthlyTotal = useMemo(() => {
     const now = new Date();
 
@@ -110,7 +111,6 @@ export default function HomeScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-
     const today = new Date();
 
     const isToday =
@@ -138,6 +138,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good evening 👋</Text>
+
             <Text style={styles.name}>Hirusha</Text>
           </View>
 
@@ -195,7 +196,7 @@ export default function HomeScreen() {
           />
         </TouchableOpacity>
 
-        {/* Recent */}
+        {/* Recent Expenses */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
             Recent expenses
@@ -208,6 +209,7 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Expense Content */}
         {loading ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
@@ -240,47 +242,46 @@ export default function HomeScreen() {
 
               return (
                 <TouchableOpacity
-  key={expense.id}
-  style={styles.expenseItem}
-  activeOpacity={0.7}
-  onPress={() =>
-    router.push({
-      pathname: "/edit-expense",
-      params: {
-        id: String(expense.id),
-      },
-    })
-  }
->
+                  key={expense.id}
+                  style={styles.expenseItem}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/edit-expense",
+                      params: {
+                        id: String(expense.id),
+                      },
+                    })
+                  }
+                >
+                  {/* Category Icon */}
                   <View
                     style={[
                       styles.expenseIcon,
                       {
-                        backgroundColor:
-                          `${categoryColor}20`,
+                        backgroundColor: `${categoryColor}20`,
                       },
                     ]}
                   >
                     <Ionicons
-                      name={getCategoryIcon(
-                        expense.category
-                      )}
+                      name={getCategoryIcon(expense.category)}
                       size={22}
                       color={categoryColor}
                     />
                   </View>
 
+                  {/* Expense Information */}
                   <View style={styles.expenseInfo}>
                     <Text style={styles.expenseCategory}>
                       {expense.category}
                     </Text>
 
                     <Text style={styles.expenseNote}>
-                      {expense.note ||
-                        formatDate(expense.date)}
+                      {expense.note || formatDate(expense.date)}
                     </Text>
                   </View>
 
+                  {/* Amount + Date */}
                   <View style={styles.expenseRight}>
                     <Text style={styles.expenseAmount}>
                       - {formatAmount(expense.amount)}
@@ -290,16 +291,20 @@ export default function HomeScreen() {
                       {formatDate(expense.date)}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
-          </TouchableOpacity>
         )}
 
         {/* Bottom Navigation */}
         <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem}>
+
+          {/* Home */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push("/")}
+          >
             <Ionicons
               name="home"
               size={23}
@@ -311,6 +316,7 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
 
+          {/* Add */}
           <TouchableOpacity
             style={styles.centerAdd}
             onPress={() => router.push("/add-expense")}
@@ -322,7 +328,11 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.navItem}>
+          {/* Insights */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push("/insights")}
+          >
             <Ionicons
               name="pie-chart-outline"
               size={23}
@@ -334,7 +344,11 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.navItem}>
+          {/* Budgets */}
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => router.push("/budgets")}
+          >
             <Ionicons
               name="wallet-outline"
               size={23}
@@ -345,6 +359,7 @@ export default function HomeScreen() {
               Budgets
             </Text>
           </TouchableOpacity>
+
         </View>
       </ScrollView>
     </SafeAreaView>
