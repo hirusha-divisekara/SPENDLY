@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import BottomNav from "../components/BottomNav";
 import { Expense, getExpenses } from "../db/database";
 
 export default function HomeScreen() {
@@ -176,6 +177,7 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push("/add-expense")}
+          activeOpacity={0.8}
         >
           <View style={styles.addIcon}>
             <Ionicons
@@ -296,72 +298,10 @@ export default function HomeScreen() {
             })}
           </View>
         )}
-
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-
-          {/* Home */}
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push("/")}
-          >
-            <Ionicons
-              name="home"
-              size={23}
-              color="#FFFFFF"
-            />
-
-            <Text style={styles.navActive}>
-              Home
-            </Text>
-          </TouchableOpacity>
-
-          {/* Add */}
-          <TouchableOpacity
-            style={styles.centerAdd}
-            onPress={() => router.push("/add-expense")}
-          >
-            <Ionicons
-              name="add"
-              size={30}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
-
-          {/* Insights */}
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push("/insights")}
-          >
-            <Ionicons
-              name="pie-chart-outline"
-              size={23}
-              color="#71717A"
-            />
-
-            <Text style={styles.navText}>
-              Insights
-            </Text>
-          </TouchableOpacity>
-
-          {/* Budgets */}
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={() => router.push("/budgets")}
-          >
-            <Ionicons
-              name="wallet-outline"
-              size={23}
-              color="#71717A"
-            />
-
-            <Text style={styles.navText}>
-              Budgets
-            </Text>
-          </TouchableOpacity>
-
-        </View>
       </ScrollView>
+
+      {/* Fixed Bottom Navigation */}
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -589,47 +529,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
     lineHeight: 20,
-  },
-
-  bottomNav: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    height: 68,
-    borderRadius: 22,
-    backgroundColor: "#18181B",
-    borderWidth: 1,
-    borderColor: "#27272A",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-  },
-
-  navItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 60,
-  },
-
-  navActive: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    marginTop: 4,
-  },
-
-  navText: {
-    color: "#71717A",
-    fontSize: 10,
-    marginTop: 4,
-  },
-
-  centerAdd: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
