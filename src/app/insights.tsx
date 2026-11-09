@@ -10,6 +10,7 @@ import {
     View,
 } from "react-native";
 
+import BottomNav from "../components/BottomNav";
 import { Expense, getExpenses } from "../db/database";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -33,8 +34,10 @@ const CATEGORY_ICONS: Record<string, any> = {
 };
 
 export default function InsightsScreen() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses] =
+    useState<Expense[]>([]);
+  const [loading, setLoading] =
+    useState(true);
 
   const loadExpenses = async () => {
     try {
@@ -44,7 +47,10 @@ export default function InsightsScreen() {
 
       setExpenses(data);
     } catch (error) {
-      console.error("❌ INSIGHTS LOAD ERROR:", error);
+      console.error(
+        "❌ INSIGHTS LOAD ERROR:",
+        error
+      );
     } finally {
       setLoading(false);
     }
@@ -68,14 +74,16 @@ export default function InsightsScreen() {
 
       return (
         date.getMonth() === now.getMonth() &&
-        date.getFullYear() === now.getFullYear()
+        date.getFullYear() ===
+          now.getFullYear()
       );
     });
   }, [expenses]);
 
   const monthlyTotal = useMemo(() => {
     return monthlyExpenses.reduce(
-      (total, expense) => total + expense.amount,
+      (total, expense) =>
+        total + expense.amount,
       0
     );
   }, [monthlyExpenses]);
@@ -86,49 +94,94 @@ export default function InsightsScreen() {
     const startOfWeek = new Date(now);
     const day = now.getDay();
 
-    startOfWeek.setDate(now.getDate() - day);
-    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(
+      now.getDate() - day
+    );
+    startOfWeek.setHours(
+      0,
+      0,
+      0,
+      0
+    );
 
     return expenses
       .filter((expense) => {
-        const date = new Date(expense.date);
+        const date = new Date(
+          expense.date
+        );
 
-        return date >= startOfWeek && date <= now;
+        return (
+          date >= startOfWeek &&
+          date <= now
+        );
       })
-      .reduce((total, expense) => total + expense.amount, 0);
+      .reduce(
+        (total, expense) =>
+          total + expense.amount,
+        0
+      );
   }, [expenses]);
 
   const categoryData = useMemo(() => {
-    const totals: Record<string, number> = {};
+    const totals: Record<
+      string,
+      number
+    > = {};
 
-    monthlyExpenses.forEach((expense) => {
-      totals[expense.category] =
-        (totals[expense.category] || 0) + expense.amount;
-    });
+    monthlyExpenses.forEach(
+      (expense) => {
+        totals[expense.category] =
+          (totals[expense.category] ||
+            0) +
+          expense.amount;
+      }
+    );
 
     return Object.entries(totals)
       .map(([category, amount]) => ({
         category,
         amount,
         percentage:
-          monthlyTotal > 0 ? (amount / monthlyTotal) * 100 : 0,
+          monthlyTotal > 0
+            ? (amount /
+                monthlyTotal) *
+              100
+            : 0,
       }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [monthlyExpenses, monthlyTotal]);
+      .sort(
+        (a, b) =>
+          b.amount - a.amount
+      );
+  }, [
+    monthlyExpenses,
+    monthlyTotal,
+  ]);
 
-  const topCategory = categoryData[0];
+  const topCategory =
+    categoryData[0];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+    >
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={
+          false
+        }
+        contentContainerStyle={
+          styles.content
+        }
       >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
+            style={
+              styles.backButton
+            }
+            onPress={() =>
+              router.replace("/")
+            }
+            activeOpacity={0.7}
           >
             <Ionicons
               name="chevron-back"
@@ -137,39 +190,85 @@ export default function InsightsScreen() {
             />
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <Text style={styles.title}>Insights</Text>
+          <View
+            style={
+              styles.headerCenter
+            }
+          >
+            <Text
+              style={styles.title}
+            >
+              Insights
+            </Text>
 
-            <Text style={styles.subtitle}>
+            <Text
+              style={
+                styles.subtitle
+              }
+            >
               Your spending overview
             </Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View
+            style={
+              styles.headerSpacer
+            }
+          />
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.mutedText}>
+          <View
+            style={
+              styles.loadingContainer
+            }
+          >
+            <Text
+              style={
+                styles.mutedText
+              }
+            >
               Loading insights...
             </Text>
           </View>
         ) : (
           <>
             {/* Total */}
-            <View style={styles.totalCard}>
-              <View style={styles.cardTop}>
+            <View
+              style={
+                styles.totalCard
+              }
+            >
+              <View
+                style={
+                  styles.cardTop
+                }
+              >
                 <View>
-                  <Text style={styles.cardLabel}>
+                  <Text
+                    style={
+                      styles.cardLabel
+                    }
+                  >
                     Total spent
                   </Text>
 
-                  <Text style={styles.totalAmount}>
-                    {formatAmount(monthlyTotal)}
+                  <Text
+                    style={
+                      styles.totalAmount
+                    }
+                  >
+                    {formatAmount(
+                      monthlyTotal
+                    )}
                   </Text>
                 </View>
 
-                <View style={styles.iconCircle}>
+                <View
+                  style={
+                    styles.iconCircle
+                  }
+                >
                   <Ionicons
                     name="trending-up-outline"
                     size={23}
@@ -178,15 +277,31 @@ export default function InsightsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.periodText}>
+              <Text
+                style={
+                  styles.periodText
+                }
+              >
                 This month
               </Text>
             </View>
 
             {/* Weekly */}
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <View style={styles.statIcon}>
+            <View
+              style={
+                styles.statsRow
+              }
+            >
+              <View
+                style={
+                  styles.statCard
+                }
+              >
+                <View
+                  style={
+                    styles.statIcon
+                  }
+                >
                   <Ionicons
                     name="calendar-outline"
                     size={20}
@@ -194,17 +309,35 @@ export default function InsightsScreen() {
                   />
                 </View>
 
-                <Text style={styles.statLabel}>
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
                   This week
                 </Text>
 
-                <Text style={styles.statValue}>
-                  {formatAmount(weeklyTotal)}
+                <Text
+                  style={
+                    styles.statValue
+                  }
+                >
+                  {formatAmount(
+                    weeklyTotal
+                  )}
                 </Text>
               </View>
 
-              <View style={styles.statCard}>
-                <View style={styles.statIcon}>
+              <View
+                style={
+                  styles.statCard
+                }
+              >
+                <View
+                  style={
+                    styles.statIcon
+                  }
+                >
                   <Ionicons
                     name="receipt-outline"
                     size={20}
@@ -212,144 +345,270 @@ export default function InsightsScreen() {
                   />
                 </View>
 
-                <Text style={styles.statLabel}>
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
                   Transactions
                 </Text>
 
-                <Text style={styles.statValue}>
-                  {monthlyExpenses.length}
+                <Text
+                  style={
+                    styles.statValue
+                  }
+                >
+                  {
+                    monthlyExpenses.length
+                  }
                 </Text>
               </View>
             </View>
 
             {/* Top Category */}
             {topCategory && (
-              <View style={styles.topCard}>
-                <View style={styles.topIcon}>
+              <View
+                style={
+                  styles.topCard
+                }
+              >
+                <View
+                  style={
+                    styles.topIcon
+                  }
+                >
                   <Ionicons
                     name={
-                      CATEGORY_ICONS[topCategory.category] ||
+                      CATEGORY_ICONS[
+                        topCategory.category
+                      ] ||
                       CATEGORY_ICONS.Other
                     }
                     size={25}
                     color={
-                      CATEGORY_COLORS[topCategory.category] ||
+                      CATEGORY_COLORS[
+                        topCategory.category
+                      ] ||
                       CATEGORY_COLORS.Other
                     }
                   />
                 </View>
 
-                <View style={styles.topInfo}>
-                  <Text style={styles.topLabel}>
+                <View
+                  style={
+                    styles.topInfo
+                  }
+                >
+                  <Text
+                    style={
+                      styles.topLabel
+                    }
+                  >
                     Highest spending category
                   </Text>
 
-                  <Text style={styles.topCategory}>
-                    {topCategory.category}
+                  <Text
+                    style={
+                      styles.topCategory
+                    }
+                  >
+                    {
+                      topCategory.category
+                    }
                   </Text>
 
-                  <Text style={styles.topAmount}>
-                    {formatAmount(topCategory.amount)}
+                  <Text
+                    style={
+                      styles.topAmount
+                    }
+                  >
+                    {formatAmount(
+                      topCategory.amount
+                    )}
                   </Text>
                 </View>
 
-                <Text style={styles.topPercentage}>
-                  {Math.round(topCategory.percentage)}%
+                <Text
+                  style={
+                    styles.topPercentage
+                  }
+                >
+                  {Math.round(
+                    topCategory.percentage
+                  )}
+                  %
                 </Text>
               </View>
             )}
 
             {/* Categories */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
+            <View
+              style={
+                styles.section
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
                 Spending by category
               </Text>
 
-              {categoryData.length === 0 ? (
-                <View style={styles.emptyCard}>
+              {categoryData.length ===
+              0 ? (
+                <View
+                  style={
+                    styles.emptyCard
+                  }
+                >
                   <Ionicons
                     name="analytics-outline"
                     size={35}
                     color="#52525B"
                   />
 
-                  <Text style={styles.emptyTitle}>
+                  <Text
+                    style={
+                      styles.emptyTitle
+                    }
+                  >
                     No spending data
                   </Text>
 
-                  <Text style={styles.emptyText}>
-                    Add some expenses to see your spending
+                  <Text
+                    style={
+                      styles.emptyText
+                    }
+                  >
+                    Add some expenses to
+                    see your spending
                     breakdown.
                   </Text>
                 </View>
               ) : (
-                <View style={styles.categoryCard}>
-                  {categoryData.map((item) => {
-                    const color =
-                      CATEGORY_COLORS[item.category] ||
-                      CATEGORY_COLORS.Other;
+                <View
+                  style={
+                    styles.categoryCard
+                  }
+                >
+                  {categoryData.map(
+                    (item) => {
+                      const color =
+                        CATEGORY_COLORS[
+                          item.category
+                        ] ||
+                        CATEGORY_COLORS.Other;
 
-                    const icon =
-                      CATEGORY_ICONS[item.category] ||
-                      CATEGORY_ICONS.Other;
+                      const icon =
+                        CATEGORY_ICONS[
+                          item.category
+                        ] ||
+                        CATEGORY_ICONS.Other;
 
-                    return (
-                      <View
-                        key={item.category}
-                        style={styles.categoryRow}
-                      >
+                      return (
                         <View
-                          style={[
-                            styles.categoryIcon,
-                            {
-                              backgroundColor: `${color}20`,
-                            },
-                          ]}
+                          key={
+                            item.category
+                          }
+                          style={
+                            styles.categoryRow
+                          }
                         >
-                          <Ionicons
-                            name={icon}
-                            size={19}
-                            color={color}
-                          />
-                        </View>
-
-                        <View style={styles.categoryInfo}>
-                          <View style={styles.categoryTop}>
-                            <Text style={styles.categoryName}>
-                              {item.category}
-                            </Text>
-
-                            <Text style={styles.categoryAmount}>
-                              {formatAmount(item.amount)}
-                            </Text>
-                          </View>
-
-                          <View style={styles.progressBackground}>
-                            <View
-                              style={[
-                                styles.progressFill,
-                                {
-                                  width: `${item.percentage}%`,
-                                  backgroundColor: color,
-                                },
-                              ]}
+                          <View
+                            style={[
+                              styles.categoryIcon,
+                              {
+                                backgroundColor:
+                                  `${color}20`,
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name={
+                                icon
+                              }
+                              size={
+                                19
+                              }
+                              color={
+                                color
+                              }
                             />
                           </View>
 
-                          <Text style={styles.percentageText}>
-                            {Math.round(item.percentage)}%
-                            of monthly spending
-                          </Text>
+                          <View
+                            style={
+                              styles.categoryInfo
+                            }
+                          >
+                            <View
+                              style={
+                                styles.categoryTop
+                              }
+                            >
+                              <Text
+                                style={
+                                  styles.categoryName
+                                }
+                              >
+                                {
+                                  item.category
+                                }
+                              </Text>
+
+                              <Text
+                                style={
+                                  styles.categoryAmount
+                                }
+                              >
+                                {formatAmount(
+                                  item.amount
+                                )}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={
+                                styles.progressBackground
+                              }
+                            >
+                              <View
+                                style={[
+                                  styles.progressFill,
+                                  {
+                                    width:
+                                      `${item.percentage}%`,
+                                    backgroundColor:
+                                      color,
+                                  },
+                                ]}
+                              />
+                            </View>
+
+                            <Text
+                              style={
+                                styles.percentageText
+                              }
+                            >
+                              {Math.round(
+                                item.percentage
+                              )}
+                              % of monthly spending
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    }
+                  )}
                 </View>
               )}
             </View>
           </>
         )}
       </ScrollView>
+
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -362,7 +621,7 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
 
   header: {
@@ -553,10 +812,6 @@ const styles = StyleSheet.create({
   categoryRow: {
     flexDirection: "row",
     marginBottom: 18,
-  },
-
-  categoryRowLast: {
-    marginBottom: 0,
   },
 
   categoryIcon: {

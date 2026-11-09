@@ -1,5 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import {
+    router,
+    useLocalSearchParams,
+} from "expo-router";
 import { useEffect, useState } from "react";
 import {
     Alert,
@@ -57,7 +60,8 @@ const categories = [
 ];
 
 export default function EditExpenseScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } =
+    useLocalSearchParams<{ id: string }>();
 
   const [amount, setAmount] = useState("");
   const [selectedCategory, setSelectedCategory] =
@@ -75,7 +79,8 @@ export default function EditExpenseScreen() {
     try {
       if (!id) return;
 
-      const expense = await getExpenseById(Number(id));
+      const expense =
+        await getExpenseById(Number(id));
 
       if (!expense) {
         Alert.alert(
@@ -96,7 +101,10 @@ export default function EditExpenseScreen() {
       setSelectedCategory(expense.category);
       setNote(expense.note);
     } catch (error) {
-      console.error("❌ LOAD EXPENSE ERROR:", error);
+      console.error(
+        "❌ LOAD EXPENSE ERROR:",
+        error
+      );
 
       Alert.alert(
         "Error",
@@ -141,7 +149,10 @@ export default function EditExpenseScreen() {
         ]
       );
     } catch (error) {
-      console.error("❌ UPDATE ERROR:", error);
+      console.error(
+        "❌ UPDATE ERROR:",
+        error
+      );
 
       Alert.alert(
         "Couldn't update expense",
@@ -168,7 +179,9 @@ export default function EditExpenseScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteExpense(Number(id));
+              await deleteExpense(
+                Number(id)
+              );
 
               Alert.alert(
                 "Expense deleted",
@@ -176,7 +189,8 @@ export default function EditExpenseScreen() {
                 [
                   {
                     text: "Done",
-                    onPress: () => router.back(),
+                    onPress: () =>
+                      router.back(),
                   },
                 ]
               );
@@ -215,11 +229,11 @@ export default function EditExpenseScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
+            activeOpacity={0.7}
           >
             <Ionicons
               name="arrow-back"
@@ -235,7 +249,6 @@ export default function EditExpenseScreen() {
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Amount */}
         <View style={styles.amountSection}>
           <Text style={styles.label}>
             Amount
@@ -257,7 +270,6 @@ export default function EditExpenseScreen() {
           </View>
         </View>
 
-        {/* Category */}
         <View style={styles.section}>
           <Text style={styles.label}>
             Category
@@ -266,7 +278,8 @@ export default function EditExpenseScreen() {
           <View style={styles.categoryGrid}>
             {categories.map((category) => {
               const selected =
-                selectedCategory === category.name;
+                selectedCategory ===
+                category.name;
 
               return (
                 <TouchableOpacity
@@ -281,6 +294,7 @@ export default function EditExpenseScreen() {
                     selected &&
                       styles.categoryCardSelected,
                   ]}
+                  activeOpacity={0.8}
                 >
                   <View
                     style={[
@@ -292,7 +306,9 @@ export default function EditExpenseScreen() {
                     ]}
                   >
                     <Ionicons
-                      name={category.icon as any}
+                      name={
+                        category.icon as any
+                      }
                       size={24}
                       color={category.color}
                     />
@@ -323,7 +339,6 @@ export default function EditExpenseScreen() {
           </View>
         </View>
 
-        {/* Note */}
         <View style={styles.section}>
           <Text style={styles.label}>
             Note
@@ -339,14 +354,15 @@ export default function EditExpenseScreen() {
           />
         </View>
 
-        {/* Save */}
         <TouchableOpacity
           style={[
             styles.saveButton,
-            saving && styles.disabledButton,
+            saving &&
+              styles.disabledButton,
           ]}
           onPress={handleUpdate}
           disabled={saving}
+          activeOpacity={0.8}
         >
           <Ionicons
             name="checkmark-circle-outline"
@@ -361,10 +377,10 @@ export default function EditExpenseScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Delete */}
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={handleDelete}
+          activeOpacity={0.8}
         >
           <Ionicons
             name="trash-outline"

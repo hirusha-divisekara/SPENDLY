@@ -33,14 +33,12 @@ export default function HomeScreen() {
     }
   };
 
-  // Reload expenses every time we return to Home
   useFocusEffect(
     useCallback(() => {
       loadExpenses();
     }, [])
   );
 
-  // Calculate current month's total
   const monthlyTotal = useMemo(() => {
     const now = new Date();
 
@@ -64,22 +62,16 @@ export default function HomeScreen() {
     switch (category) {
       case "Food":
         return "restaurant-outline";
-
       case "Transport":
         return "car-outline";
-
       case "Shopping":
         return "bag-handle-outline";
-
       case "Bills":
         return "receipt-outline";
-
       case "Entertainment":
         return "game-controller-outline";
-
       case "Health":
         return "medkit-outline";
-
       default:
         return "ellipsis-horizontal-circle-outline";
     }
@@ -89,22 +81,16 @@ export default function HomeScreen() {
     switch (category) {
       case "Food":
         return "#F97316";
-
       case "Transport":
         return "#3B82F6";
-
       case "Shopping":
         return "#EC4899";
-
       case "Bills":
         return "#8B5CF6";
-
       case "Entertainment":
         return "#10B981";
-
       case "Health":
         return "#EF4444";
-
       default:
         return "#64748B";
     }
@@ -139,7 +125,6 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good evening 👋</Text>
-
             <Text style={styles.name}>Hirusha</Text>
           </View>
 
@@ -256,7 +241,6 @@ export default function HomeScreen() {
                     })
                   }
                 >
-                  {/* Category Icon */}
                   <View
                     style={[
                       styles.expenseIcon,
@@ -272,7 +256,6 @@ export default function HomeScreen() {
                     />
                   </View>
 
-                  {/* Expense Information */}
                   <View style={styles.expenseInfo}>
                     <Text style={styles.expenseCategory}>
                       {expense.category}
@@ -283,7 +266,6 @@ export default function HomeScreen() {
                     </Text>
                   </View>
 
-                  {/* Amount + Date */}
                   <View style={styles.expenseRight}>
                     <Text style={styles.expenseAmount}>
                       - {formatAmount(expense.amount)}
@@ -300,7 +282,6 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* Fixed Bottom Navigation */}
       <BottomNav />
     </SafeAreaView>
   );

@@ -115,11 +115,11 @@ export default function AddExpenseScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
+            activeOpacity={0.7}
           >
             <Ionicons
               name="arrow-back"
@@ -128,12 +128,13 @@ export default function AddExpenseScreen() {
             />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Add Expense</Text>
+          <Text style={styles.title}>
+            Add Expense
+          </Text>
 
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Amount */}
         <View style={styles.amountSection}>
           <Text style={styles.label}>Amount</Text>
 
@@ -152,7 +153,6 @@ export default function AddExpenseScreen() {
           </View>
         </View>
 
-        {/* Category */}
         <View style={styles.section}>
           <Text style={styles.label}>Category</Text>
 
@@ -171,12 +171,14 @@ export default function AddExpenseScreen() {
                     styles.categoryCard,
                     selected && styles.categoryCardSelected,
                   ]}
+                  activeOpacity={0.8}
                 >
                   <View
                     style={[
                       styles.iconContainer,
                       {
-                        backgroundColor: `${category.color}20`,
+                        backgroundColor:
+                          `${category.color}20`,
                       },
                     ]}
                   >
@@ -190,7 +192,8 @@ export default function AddExpenseScreen() {
                   <Text
                     style={[
                       styles.categoryText,
-                      selected && styles.categoryTextSelected,
+                      selected &&
+                        styles.categoryTextSelected,
                     ]}
                   >
                     {category.name}
@@ -211,9 +214,10 @@ export default function AddExpenseScreen() {
           </View>
         </View>
 
-        {/* Note */}
         <View style={styles.section}>
-          <Text style={styles.label}>Note (optional)</Text>
+          <Text style={styles.label}>
+            Note (optional)
+          </Text>
 
           <TextInput
             value={note}
@@ -225,7 +229,6 @@ export default function AddExpenseScreen() {
           />
         </View>
 
-        {/* Save */}
         <TouchableOpacity
           style={[
             styles.saveButton,
@@ -233,6 +236,7 @@ export default function AddExpenseScreen() {
           ]}
           onPress={handleSave}
           disabled={saving}
+          activeOpacity={0.8}
         >
           {saving ? (
             <Text style={styles.saveText}>
