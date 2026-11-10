@@ -15,39 +15,26 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
-import { Expense, getExpenses } from "../db/database";
+import {
+    Expense,
+    getExpenses,
+} from "../db/database";
 
 const BLUE = "#2563EB";
-const BLUE_LIGHT = "#EAF1FF";
 const GOLD = "#B88A24";
 const BG = "#F5F8FC";
 const TEXT = "#0F172A";
 const MUTED = "#64748B";
 const WHITE = "#FFFFFF";
-const BORDER = "rgba(148,163,184,0.18)";
 
-type DateFilter = "month" | "lastMonth" | "threeMonths" | "all";
-type CategoryFilter = string;
+const BORDER =
+  "rgba(148,163,184,0.18)";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Food: "#F97316",
-  Transport: "#3B82F6",
-  Shopping: "#EC4899",
-  Bills: "#8B5CF6",
-  Entertainment: "#10B981",
-  Health: "#EF4444",
-  Other: "#64748B",
-};
-
-const CATEGORY_ICONS: Record<string, any> = {
-  Food: "restaurant-outline",
-  Transport: "car-outline",
-  Shopping: "bag-handle-outline",
-  Bills: "receipt-outline",
-  Entertainment: "game-controller-outline",
-  Health: "medkit-outline",
-  Other: "ellipsis-horizontal-circle-outline",
-};
+type DateFilter =
+  | "month"
+  | "lastMonth"
+  | "threeMonths"
+  | "all";
 
 const DATE_FILTERS: {
   id: DateFilter;
@@ -71,36 +58,90 @@ const DATE_FILTERS: {
   },
 ];
 
+const CATEGORY_COLORS: Record<
+  string,
+  string
+> = {
+  Food: "#F97316",
+  Transport: "#3B82F6",
+  Shopping: "#EC4899",
+  Bills: "#8B5CF6",
+  Entertainment: "#10B981",
+  Health: "#EF4444",
+  Other: "#64748B",
+};
+
+const CATEGORY_ICONS: Record<
+  string,
+  any
+> = {
+  Food: "restaurant-outline",
+  Transport: "car-outline",
+  Shopping: "bag-handle-outline",
+  Bills: "receipt-outline",
+  Entertainment:
+    "game-controller-outline",
+  Health: "medkit-outline",
+  Other:
+    "ellipsis-horizontal-circle-outline",
+};
+
 export default function ReportsScreen() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dateFilter, setDateFilter] =
-    useState<DateFilter>("month");
-  const [categoryFilter, setCategoryFilter] =
-    useState<CategoryFilter>("All");
-  const [exporting, setExporting] = useState(false);
+  const [
+    expenses,
+    setExpenses,
+  ] = useState<Expense[]>([]);
 
-  const loadExpenses = async () => {
-    try {
-      setLoading(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-      const data = await getExpenses();
+  const [
+    dateFilter,
+    setDateFilter,
+  ] =
+    useState<DateFilter>(
+      "month"
+    );
 
-      setExpenses(data);
-    } catch (error) {
-      console.error(
-        "❌ REPORTS LOAD ERROR:",
-        error
-      );
+  const [
+    categoryFilter,
+    setCategoryFilter,
+  ] =
+    useState("All");
 
-      Alert.alert(
-        "Unable to load reports",
-        "Something went wrong while loading your expenses."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [
+    exporting,
+    setExporting,
+  ] = useState(false);
+
+  /*
+   * LOAD EXPENSES
+   */
+  const loadExpenses =
+    async () => {
+      try {
+        setLoading(true);
+
+        const data =
+          await getExpenses();
+
+        setExpenses(data);
+      } catch (error) {
+        console.error(
+          "REPORTS LOAD ERROR:",
+          error
+        );
+
+        Alert.alert(
+          "Unable to load reports",
+          "Something went wrong while loading your expenses."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
   useFocusEffect(
     useCallback(() => {
@@ -109,181 +150,259 @@ export default function ReportsScreen() {
   );
 
   /*
-   * FORMAT CURRENCY
+   * FORMAT LKR
    */
-  const formatAmount = (amount: number) => {
-    return `Rs. ${amount.toLocaleString("en-LK", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
+  const formatAmount =
+    (
+      amount: number
+    ) => {
+      return `Rs. ${amount.toLocaleString(
+        "en-LK",
+        {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }
+      )}`;
+    };
 
   /*
    * FORMAT DATE
    */
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate =
+    (
+      dateString: string
+    ) => {
+      const date =
+        new Date(
+          dateString
+        );
 
-    if (Number.isNaN(date.getTime())) {
-      return dateString;
-    }
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+        return dateString;
+      }
 
-    return date.toLocaleDateString("en-LK", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
+      return date.toLocaleDateString(
+        "en-LK",
+        {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }
+      );
+    };
 
   /*
    * CATEGORY COLOR
    */
-  const getCategoryColor = (category: string) => {
-    return (
-      CATEGORY_COLORS[category] ||
-      "#64748B"
-    );
-  };
+  const getCategoryColor =
+    (
+      category: string
+    ) => {
+      return (
+        CATEGORY_COLORS[
+          category
+        ] ||
+        "#64748B"
+      );
+    };
 
   /*
    * CATEGORY ICON
    */
-  const getCategoryIcon = (
-    category: string
-  ): any => {
-    return (
-      CATEGORY_ICONS[category] ||
-      "pricetag-outline"
-    );
-  };
-
-  /*
-   * AVAILABLE CATEGORIES
-   *
-   * Generated from actual expenses so
-   * custom categories work automatically.
-   */
-  const categories = useMemo(() => {
-    const unique = Array.from(
-      new Set(
-        expenses.map(
-          (expense) => expense.category
-        )
-      )
-    );
-
-    return [
-      "All",
-      ...unique.sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    ];
-  }, [expenses]);
-
-  /*
-   * DATE RANGE FILTER
-   */
-  const filteredByDate = useMemo(() => {
-    const now = new Date();
-
-    return expenses.filter((expense) => {
-      const expenseDate = new Date(
-        expense.date
+  const getCategoryIcon =
+    (
+      category: string
+    ): any => {
+      return (
+        CATEGORY_ICONS[
+          category
+        ] ||
+        "pricetag-outline"
       );
+    };
 
-      if (
-        Number.isNaN(
-          expenseDate.getTime()
-        )
-      ) {
-        return false;
-      }
-
-      if (dateFilter === "all") {
-        return true;
-      }
-
-      if (dateFilter === "month") {
-        return (
-          expenseDate.getMonth() ===
-            now.getMonth() &&
-          expenseDate.getFullYear() ===
-            now.getFullYear()
-        );
-      }
-
-      if (dateFilter === "lastMonth") {
-        const lastMonth = new Date(
-          now.getFullYear(),
-          now.getMonth() - 1,
-          1
+  /*
+   * CATEGORY LIST
+   *
+   * This is generated from
+   * actual expenses, so
+   * custom categories work.
+   */
+  const categories =
+    useMemo(() => {
+      const unique =
+        Array.from(
+          new Set(
+            expenses.map(
+              (expense) =>
+                expense.category
+            )
+          )
         );
 
-        return (
-          expenseDate.getMonth() ===
-            lastMonth.getMonth() &&
-          expenseDate.getFullYear() ===
-            lastMonth.getFullYear()
-        );
-      }
+      return [
+        "All",
+        ...unique.sort(
+          (a, b) =>
+            a.localeCompare(
+              b
+            )
+        ),
+      ];
+    }, [expenses]);
 
-      if (
-        dateFilter === "threeMonths"
-      ) {
-        const threeMonthsAgo =
-          new Date(now);
+  /*
+   * DATE FILTER
+   */
+  const filteredByDate =
+    useMemo(() => {
+      const now =
+        new Date();
 
-        threeMonthsAgo.setMonth(
-          now.getMonth() - 2
-        );
+      return expenses.filter(
+        (expense) => {
+          const expenseDate =
+            new Date(
+              expense.date
+            );
 
-        threeMonthsAgo.setHours(
-          0,
-          0,
-          0,
-          0
-        );
+          if (
+            Number.isNaN(
+              expenseDate.getTime()
+            )
+          ) {
+            return false;
+          }
 
-        return (
-          expenseDate >=
-          threeMonthsAgo
-        );
-      }
+          /*
+           * ALL TIME
+           */
+          if (
+            dateFilter ===
+            "all"
+          ) {
+            return true;
+          }
 
-      return true;
-    });
-  }, [expenses, dateFilter]);
+          /*
+           * THIS MONTH
+           */
+          if (
+            dateFilter ===
+            "month"
+          ) {
+            return (
+              expenseDate.getMonth() ===
+                now.getMonth() &&
+              expenseDate.getFullYear() ===
+                now.getFullYear()
+            );
+          }
+
+          /*
+           * LAST MONTH
+           */
+          if (
+            dateFilter ===
+            "lastMonth"
+          ) {
+            const lastMonth =
+              new Date(
+                now.getFullYear(),
+                now.getMonth() -
+                  1,
+                1
+              );
+
+            return (
+              expenseDate.getMonth() ===
+                lastMonth.getMonth() &&
+              expenseDate.getFullYear() ===
+                lastMonth.getFullYear()
+            );
+          }
+
+          /*
+           * LAST 3 MONTHS
+           */
+          if (
+            dateFilter ===
+            "threeMonths"
+          ) {
+            const threeMonthsAgo =
+              new Date(
+                now
+              );
+
+            threeMonthsAgo.setMonth(
+              now.getMonth() -
+                2
+            );
+
+            threeMonthsAgo.setHours(
+              0,
+              0,
+              0,
+              0
+            );
+
+            return (
+              expenseDate >=
+              threeMonthsAgo
+            );
+          }
+
+          return true;
+        }
+      );
+    }, [
+      expenses,
+      dateFilter,
+    ]);
 
   /*
    * CATEGORY FILTER
    */
-  const filteredExpenses = useMemo(() => {
-    if (
-      categoryFilter === "All"
-    ) {
-      return filteredByDate;
-    }
+  const filteredExpenses =
+    useMemo(() => {
+      if (
+        categoryFilter ===
+        "All"
+      ) {
+        return filteredByDate;
+      }
 
-    return filteredByDate.filter(
-      (expense) =>
-        expense.category ===
-        categoryFilter
-    );
-  }, [
-    filteredByDate,
-    categoryFilter,
-  ]);
+      return filteredByDate.filter(
+        (expense) =>
+          expense.category ===
+          categoryFilter
+      );
+    }, [
+      filteredByDate,
+      categoryFilter,
+    ]);
 
   /*
-   * TOTAL SPENDING
+   * TOTAL
    */
-  const totalSpent = useMemo(() => {
-    return filteredExpenses.reduce(
-      (total, expense) =>
-        total + expense.amount,
-      0
-    );
-  }, [filteredExpenses]);
+  const totalSpent =
+    useMemo(() => {
+      return filteredExpenses.reduce(
+        (
+          total,
+          expense
+        ) =>
+          total +
+          expense.amount,
+        0
+      );
+    }, [
+      filteredExpenses,
+    ]);
 
   /*
    * TRANSACTION COUNT
@@ -292,10 +411,11 @@ export default function ReportsScreen() {
     filteredExpenses.length;
 
   /*
-   * AVERAGE TRANSACTION
+   * AVERAGE
    */
   const averageTransaction =
-    transactionCount > 0
+    transactionCount >
+    0
       ? totalSpent /
         transactionCount
       : 0;
@@ -303,51 +423,54 @@ export default function ReportsScreen() {
   /*
    * CATEGORY BREAKDOWN
    */
-  const categoryData = useMemo(() => {
-    const totals: Record<
-      string,
-      number
-    > = {};
+  const categoryData =
+    useMemo(() => {
+      const totals: Record<
+        string,
+        number
+      > = {};
 
-    filteredExpenses.forEach(
-      (expense) => {
-        totals[
-          expense.category
-        ] =
-          (totals[
+      filteredExpenses.forEach(
+        (expense) => {
+          totals[
             expense.category
-          ] || 0) +
-          expense.amount;
-      }
-    );
-
-    return Object.entries(
-      totals
-    )
-      .map(
-        ([
-          category,
-          amount,
-        ]) => ({
-          category,
-          amount,
-          percentage:
-            totalSpent > 0
-              ? (amount /
-                  totalSpent) *
-                100
-              : 0,
-        })
-      )
-      .sort(
-        (a, b) =>
-          b.amount -
-          a.amount
+          ] =
+            (totals[
+              expense.category
+            ] ||
+              0) +
+            expense.amount;
+        }
       );
-  }, [
-    filteredExpenses,
-    totalSpent,
-  ]);
+
+      return Object.entries(
+        totals
+      )
+        .map(
+          ([
+            category,
+            amount,
+          ]) => ({
+            category,
+            amount,
+            percentage:
+              totalSpent >
+              0
+                ? (amount /
+                    totalSpent) *
+                  100
+                : 0,
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.amount -
+            a.amount
+        );
+    }, [
+      filteredExpenses,
+      totalSpent,
+    ]);
 
   /*
    * TOP CATEGORY
@@ -369,154 +492,219 @@ export default function ReportsScreen() {
   /*
    * CSV ESCAPE
    */
-  const escapeCsv = (
-    value: string
-  ) => {
-    const stringValue =
-      String(value);
+  const escapeCsv =
+    (
+      value: string
+    ) => {
+      const stringValue =
+        String(
+          value
+        );
 
-    if (
-      stringValue.includes(
-        ","
-      ) ||
-      stringValue.includes(
-        '"'
-      ) ||
-      stringValue.includes(
-        "\n"
-      )
-    ) {
-      return `"${stringValue.replace(
-        /"/g,
-        '""'
-      )}"`;
-    }
+      if (
+        stringValue.includes(
+          ","
+        ) ||
+        stringValue.includes(
+          '"'
+        ) ||
+        stringValue.includes(
+          "\n"
+        )
+      ) {
+        return `"${stringValue.replace(
+          /"/g,
+          '""'
+        )}"`;
+      }
 
-    return stringValue;
-  };
+      return stringValue;
+    };
 
   /*
    * CREATE CSV
    */
-  const createCsv = () => {
-    const header =
-      [
-        "Date",
-        "Category",
-        "Note",
-        "Amount (LKR)",
-      ].join(",");
+  const createCsv =
+    () => {
+      const header =
+        [
+          "Date",
+          "Category",
+          "Note",
+          "Amount (LKR)",
+        ].join(
+          ","
+        );
 
-    const rows =
-      filteredExpenses.map(
-        (expense) =>
-          [
-            escapeCsv(
-              formatDate(
-                expense.date
-              )
-            ),
-            escapeCsv(
-              expense.category
-            ),
-            escapeCsv(
-              expense.note ||
-                ""
-            ),
-            expense.amount.toFixed(
-              2
-            ),
-          ].join(",")
+      const rows =
+        filteredExpenses.map(
+          (
+            expense
+          ) => {
+            return [
+              escapeCsv(
+                formatDate(
+                  expense.date
+                )
+              ),
+              escapeCsv(
+                expense.category
+              ),
+              escapeCsv(
+                expense.note ||
+                  ""
+              ),
+              expense.amount.toFixed(
+                2
+              ),
+            ].join(
+              ","
+            );
+          }
+        );
+
+      return [
+        header,
+        ...rows,
+      ].join(
+        "\n"
       );
-
-    return [
-      header,
-      ...rows,
-    ].join("\n");
-  };
+    };
 
   /*
-   * EXPORT REPORT
+   * EXPORT
    */
-  const handleExport = async () => {
-    if (
-      filteredExpenses.length ===
-      0
-    ) {
-      Alert.alert(
-        "Nothing to export",
-        "There are no expenses in the selected report."
-      );
-
-      return;
-    }
-
-    try {
-      setExporting(true);
-
-      const csv =
-        createCsv();
-
-      const fileName =
-        `Spendly_Report_${Date.now()}.csv`;
-
-      const fileUri =
-        `${FileSystem.cacheDirectory}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(
-        fileUri,
-        csv,
-        {
-          encoding:
-            FileSystem.EncodingType.UTF8,
-        }
-      );
-
-      const sharingAvailable =
-        await Sharing.isAvailableAsync();
-
+  const handleExport =
+    async () => {
       if (
-        !sharingAvailable
+        filteredExpenses.length ===
+        0
       ) {
         Alert.alert(
-          "Export created",
-          "The report was generated, but sharing is not available on this device."
+          "Nothing to export",
+          "There are no expenses in the selected report."
         );
 
         return;
       }
 
-      await Sharing.shareAsync(
-        fileUri,
-        {
-          mimeType:
-            "text/csv",
-          dialogTitle:
-            "Share Spendly Report",
-          UTI:
-            "public.comma-separated-values-text",
-        }
-      );
-    } catch (error) {
-      console.error(
-        "❌ REPORT EXPORT ERROR:",
-        error
-      );
+      try {
+        setExporting(
+          true
+        );
 
-      Alert.alert(
-        "Export failed",
-        "Spendly could not create the report."
-      );
-    } finally {
-      setExporting(false);
-    }
-  };
+        const csv =
+          createCsv();
+
+        const fileName =
+          `Spendly_Report_${Date.now()}.csv`;
+
+        const fileUri =
+          `${FileSystem.cacheDirectory}${fileName}`;
+
+        await FileSystem.writeAsStringAsync(
+          fileUri,
+          csv,
+          {
+            encoding:
+              FileSystem.EncodingType.UTF8,
+          }
+        );
+
+        const canShare =
+          await Sharing.isAvailableAsync();
+
+        if (
+          !canShare
+        ) {
+          Alert.alert(
+            "Export created",
+            "The report was generated, but sharing is not available on this device."
+          );
+
+          return;
+        }
+
+        await Sharing.shareAsync(
+          fileUri,
+          {
+            mimeType:
+              "text/csv",
+            dialogTitle:
+              "Share Spendly Report",
+            UTI:
+              "public.comma-separated-values-text",
+          }
+        );
+      } catch (error) {
+        console.error(
+          "REPORT EXPORT ERROR:",
+          error
+        );
+
+        Alert.alert(
+          "Export failed",
+          "Spendly could not create the report."
+        );
+      } finally {
+        setExporting(
+          false
+        );
+      }
+    };
+
+  /*
+   * LOADING
+   */
+  if (
+    loading
+  ) {
+    return (
+      <SafeAreaView
+        style={
+          styles.safeArea
+        }
+      >
+        <View
+          style={
+            styles.loadingContainer
+          }
+        >
+          <View
+            style={
+              styles.loadingIcon
+            }
+          >
+            <Ionicons
+              name="bar-chart-outline"
+              size={28}
+              color={BLUE}
+            />
+          </View>
+
+          <ActivityIndicator
+            size="small"
+            color={BLUE}
+          />
+
+          <Text
+            style={
+              styles.loadingText
+            }
+          >
+            Preparing your
+            report...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
       style={styles.safeArea}
     >
-      {/* Decorative background */}
+      {/* Background */}
       <View
         style={
           styles.backgroundOrbOne
@@ -542,7 +730,9 @@ export default function ReportsScreen() {
         {/* ========================= */}
 
         <View
-          style={styles.header}
+          style={
+            styles.header
+          }
         >
           <TouchableOpacity
             style={
@@ -607,7 +797,7 @@ export default function ReportsScreen() {
         </View>
 
         {/* ========================= */}
-        {/* SUMMARY CARD */}
+        {/* SUMMARY */}
         {/* ========================= */}
 
         <View
@@ -674,7 +864,9 @@ export default function ReportsScreen() {
                   styles.statValue
                 }
               >
-                {transactionCount}
+                {
+                  transactionCount
+                }
               </Text>
 
               <Text
@@ -728,13 +920,15 @@ export default function ReportsScreen() {
               }
             >
               <Text
+                numberOfLines={
+                  1
+                }
                 style={
                   styles.statValue
                 }
               >
                 {topCategory
-                  ? topCategory
-                      .category
+                  ? topCategory.category
                   : "—"}
               </Text>
 
@@ -750,7 +944,7 @@ export default function ReportsScreen() {
         </View>
 
         {/* ========================= */}
-        {/* PERIOD FILTER */}
+        {/* DATE FILTER */}
         {/* ========================= */}
 
         <View
@@ -776,7 +970,9 @@ export default function ReportsScreen() {
             }
           >
             {DATE_FILTERS.map(
-              (filter) => {
+              (
+                filter
+              ) => {
                 const active =
                   dateFilter ===
                   filter.id;
@@ -791,11 +987,15 @@ export default function ReportsScreen() {
                       active &&
                         styles.filterChipActive,
                     ]}
-                    onPress={() =>
+                    onPress={() => {
                       setDateFilter(
                         filter.id
-                      )
-                    }
+                      );
+
+                      setCategoryFilter(
+                        "All"
+                      );
+                    }}
                     activeOpacity={
                       0.8
                     }
@@ -845,7 +1045,9 @@ export default function ReportsScreen() {
             }
           >
             {categories.map(
-              (category) => {
+              (
+                category
+              ) => {
                 const active =
                   categoryFilter ===
                   category;
@@ -934,7 +1136,9 @@ export default function ReportsScreen() {
                   styles.cardSubtitle
                 }
               >
-                {periodLabel}
+                {
+                  periodLabel
+                }
               </Text>
             </View>
 
@@ -984,7 +1188,9 @@ export default function ReportsScreen() {
             </View>
           ) : (
             categoryData.map(
-              (item) => {
+              (
+                item
+              ) => {
                 const color =
                   getCategoryColor(
                     item.category
@@ -1031,7 +1237,11 @@ export default function ReportsScreen() {
                           />
                         </View>
 
-                        <View>
+                        <View
+                          style={
+                            styles.categoryInfo
+                          }
+                        >
                           <Text
                             style={
                               styles.categoryName
@@ -1120,7 +1330,9 @@ export default function ReportsScreen() {
                   styles.cardSubtitle
                 }
               >
-                {transactionCount}{" "}
+                {
+                  transactionCount
+                }{" "}
                 recorded
               </Text>
             </View>
@@ -1158,9 +1370,14 @@ export default function ReportsScreen() {
             </View>
           ) : (
             filteredExpenses
-              .slice(0, 30)
+              .slice(
+                0,
+                30
+              )
               .map(
-                (expense) => {
+                (
+                  expense
+                ) => {
                   const color =
                     getCategoryColor(
                       expense.category
@@ -1236,9 +1453,7 @@ export default function ReportsScreen() {
                           }
                         >
                           {expense.note ||
-                            formatDate(
-                              expense.date
-                            )}
+                            "Expense"}
                         </Text>
                       </View>
 
@@ -1281,8 +1496,8 @@ export default function ReportsScreen() {
                 styles.moreText
               }
             >
-              Showing the first
-              30 transactions
+              Showing the first 30
+              transactions
             </Text>
           )}
         </View>
@@ -1326,9 +1541,9 @@ export default function ReportsScreen() {
                 styles.exportDescription
               }
             >
-              Download your
-              filtered spending
-              data as a CSV file.
+              Share your filtered
+              spending data as
+              a CSV file.
             </Text>
           </View>
 
@@ -1366,7 +1581,7 @@ export default function ReportsScreen() {
         </View>
 
         {/* ========================= */}
-        {/* PRO FOOTER */}
+        {/* FOOTER */}
         {/* ========================= */}
 
         <View
@@ -1409,8 +1624,7 @@ const styles =
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor:
-        BG,
+      backgroundColor: BG,
     },
 
     content: {
@@ -1423,8 +1637,7 @@ const styles =
         "absolute",
       width: 260,
       height: 260,
-      borderRadius:
-        130,
+      borderRadius: 130,
       backgroundColor:
         "rgba(37,99,235,0.07)",
       top: -100,
@@ -1436,12 +1649,36 @@ const styles =
         "absolute",
       width: 220,
       height: 220,
-      borderRadius:
-        110,
+      borderRadius: 110,
       backgroundColor:
         "rgba(184,138,36,0.06)",
       bottom: 100,
       left: -130,
+    },
+
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: BG,
+    },
+
+    loadingIcon: {
+      width: 62,
+      height: 62,
+      borderRadius: 22,
+      backgroundColor:
+        "rgba(37,99,235,0.08)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 15,
+    },
+
+    loadingText: {
+      marginTop: 12,
+      fontSize: 12,
+      color: MUTED,
+      fontWeight: "600",
     },
 
     header: {
@@ -1449,8 +1686,7 @@ const styles =
         "row",
       alignItems:
         "center",
-      marginBottom:
-        24,
+      marginBottom: 24,
     },
 
     backButton: {
@@ -1472,30 +1708,29 @@ const styles =
         0.04,
       shadowRadius:
         12,
+      shadowOffset: {
+        width: 0,
+        height: 5,
+      },
       elevation: 2,
     },
 
     headerCenter: {
       flex: 1,
-      marginLeft:
-        14,
+      marginLeft: 14,
     },
 
     eyebrow: {
       fontSize: 10,
-      fontWeight:
-        "800",
-      letterSpacing:
-        1.5,
+      fontWeight: "800",
+      letterSpacing: 1.5,
       color: BLUE,
-      marginBottom:
-        2,
+      marginBottom: 2,
     },
 
     title: {
       fontSize: 26,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1553,19 +1788,15 @@ const styles =
 
     summaryLabel: {
       fontSize: 10,
-      fontWeight:
-        "800",
-      letterSpacing:
-        1.3,
+      fontWeight: "800",
+      letterSpacing: 1.3,
       color: MUTED,
-      marginBottom:
-        8,
+      marginBottom: 8,
     },
 
     totalAmount: {
       fontSize: 29,
-      fontWeight:
-        "900",
+      fontWeight: "900",
       color: TEXT,
     },
 
@@ -1574,7 +1805,7 @@ const styles =
       height: 48,
       borderRadius: 17,
       backgroundColor:
-        BLUE_LIGHT,
+        "#EAF1FF",
       alignItems:
         "center",
       justifyContent:
@@ -1585,8 +1816,7 @@ const styles =
       height: 1,
       backgroundColor:
         "rgba(148,163,184,0.16)",
-      marginVertical:
-        20,
+      marginVertical: 20,
     },
 
     summaryStats: {
@@ -1600,23 +1830,22 @@ const styles =
       flex: 1,
       alignItems:
         "center",
+      minWidth: 0,
     },
 
     statValue: {
-      fontSize: 14,
-      fontWeight:
-        "800",
+      fontSize: 12,
+      fontWeight: "800",
       color: TEXT,
-      textAlign:
-        "center",
+      textAlign: "center",
+      maxWidth: "100%",
     },
 
     statLabel: {
       fontSize: 9,
       color: MUTED,
       marginTop: 5,
-      textAlign:
-        "center",
+      textAlign: "center",
     },
 
     statDivider: {
@@ -1627,17 +1856,14 @@ const styles =
     },
 
     section: {
-      marginBottom:
-        20,
+      marginBottom: 20,
     },
 
     sectionTitle: {
       fontSize: 14,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
-      marginBottom:
-        11,
+      marginBottom: 11,
     },
 
     filterRow: {
@@ -1645,10 +1871,8 @@ const styles =
     },
 
     filterChip: {
-      paddingHorizontal:
-        15,
-      paddingVertical:
-        10,
+      paddingHorizontal: 15,
+      paddingVertical: 10,
       borderRadius: 15,
       backgroundColor:
         "rgba(255,255,255,0.76)",
@@ -1658,16 +1882,13 @@ const styles =
     },
 
     filterChipActive: {
-      backgroundColor:
-        BLUE,
-      borderColor:
-        BLUE,
+      backgroundColor: BLUE,
+      borderColor: BLUE,
     },
 
     filterText: {
       fontSize: 12,
-      fontWeight:
-        "700",
+      fontWeight: "700",
       color: MUTED,
     },
 
@@ -1681,10 +1902,8 @@ const styles =
       alignItems:
         "center",
       gap: 6,
-      paddingHorizontal:
-        14,
-      paddingVertical:
-        10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
       borderRadius: 15,
       backgroundColor:
         "rgba(255,255,255,0.76)",
@@ -1694,16 +1913,13 @@ const styles =
     },
 
     categoryChipActive: {
-      backgroundColor:
-        BLUE,
-      borderColor:
-        BLUE,
+      backgroundColor: BLUE,
+      borderColor: BLUE,
     },
 
     categoryChipText: {
       fontSize: 12,
-      fontWeight:
-        "700",
+      fontWeight: "700",
       color: MUTED,
     },
 
@@ -1722,10 +1938,8 @@ const styles =
       marginBottom: 20,
       shadowColor:
         "#0F172A",
-      shadowOpacity:
-        0.04,
-      shadowRadius:
-        18,
+      shadowOpacity: 0.04,
+      shadowRadius: 18,
       shadowOffset: {
         width: 0,
         height: 8,
@@ -1740,14 +1954,12 @@ const styles =
         "flex-start",
       justifyContent:
         "space-between",
-      marginBottom:
-        18,
+      marginBottom: 18,
     },
 
     cardTitle: {
       fontSize: 16,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1758,8 +1970,7 @@ const styles =
     },
 
     breakdownItem: {
-      marginBottom:
-        18,
+      marginBottom: 18,
     },
 
     breakdownTop: {
@@ -1769,8 +1980,7 @@ const styles =
         "center",
       justifyContent:
         "space-between",
-      marginBottom:
-        9,
+      marginBottom: 9,
     },
 
     categoryLeft: {
@@ -1779,6 +1989,7 @@ const styles =
       alignItems:
         "center",
       flex: 1,
+      minWidth: 0,
     },
 
     categoryIcon: {
@@ -1789,14 +2000,17 @@ const styles =
         "center",
       justifyContent:
         "center",
-      marginRight:
-        10,
+      marginRight: 10,
+    },
+
+    categoryInfo: {
+      flex: 1,
+      minWidth: 0,
     },
 
     categoryName: {
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1808,9 +2022,9 @@ const styles =
 
     categoryAmount: {
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
+      marginLeft: 10,
     },
 
     progressTrack: {
@@ -1818,8 +2032,7 @@ const styles =
       borderRadius: 10,
       backgroundColor:
         "#E9EEF5",
-      overflow:
-        "hidden",
+      overflow: "hidden",
     },
 
     progressFill: {
@@ -1832,10 +2045,8 @@ const styles =
         "row",
       alignItems:
         "center",
-      paddingVertical:
-        12,
-      borderBottomWidth:
-        1,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
       borderBottomColor:
         "rgba(148,163,184,0.12)",
     },
@@ -1848,8 +2059,7 @@ const styles =
         "center",
       justifyContent:
         "center",
-      marginRight:
-        11,
+      marginRight: 11,
     },
 
     transactionInfo: {
@@ -1859,8 +2069,7 @@ const styles =
 
     transactionCategory: {
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1878,8 +2087,7 @@ const styles =
 
     transactionAmount: {
       fontSize: 12,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1890,18 +2098,15 @@ const styles =
     },
 
     moreText: {
-      textAlign:
-        "center",
+      textAlign: "center",
       fontSize: 10,
       color: MUTED,
       marginTop: 14,
     },
 
     emptyBreakdown: {
-      alignItems:
-        "center",
-      paddingVertical:
-        22,
+      alignItems: "center",
+      paddingVertical: 22,
     },
 
     emptyIcon: {
@@ -1914,14 +2119,12 @@ const styles =
         "center",
       justifyContent:
         "center",
-      marginBottom:
-        10,
+      marginBottom: 10,
     },
 
     emptyTitle: {
       fontSize: 13,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1929,8 +2132,7 @@ const styles =
       fontSize: 11,
       color: MUTED,
       marginTop: 5,
-      textAlign:
-        "center",
+      textAlign: "center",
     },
 
     exportCard: {
@@ -1968,8 +2170,7 @@ const styles =
 
     exportTitle: {
       fontSize: 13,
-      fontWeight:
-        "800",
+      fontWeight: "800",
       color: TEXT,
     },
 
@@ -1984,41 +2185,33 @@ const styles =
       width: 44,
       height: 44,
       borderRadius: 15,
-      backgroundColor:
-        BLUE,
+      backgroundColor: BLUE,
       alignItems:
         "center",
       justifyContent:
         "center",
-      shadowColor:
-        BLUE,
-      shadowOpacity:
-        0.22,
-      shadowRadius:
-        12,
+      shadowColor: BLUE,
+      shadowOpacity: 0.22,
+      shadowRadius: 12,
       elevation: 3,
     },
 
     footer: {
-      alignItems:
-        "center",
+      alignItems: "center",
       paddingTop: 4,
       paddingBottom: 25,
     },
 
     footerBrand: {
       fontSize: 14,
-      fontWeight:
-        "900",
+      fontWeight: "900",
       color: BLUE,
-      letterSpacing:
-        0.5,
+      letterSpacing: 0.5,
     },
 
     footerTagline: {
       fontSize: 10,
-      fontWeight:
-        "600",
+      fontWeight: "600",
       color: MUTED,
       marginTop: 3,
     },
