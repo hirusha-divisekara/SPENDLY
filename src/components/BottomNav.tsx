@@ -1,8 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import {
-    router,
-    usePathname,
-} from "expo-router";
+import { router, usePathname } from "expo-router";
 import {
     StyleSheet,
     Text,
@@ -11,101 +8,90 @@ import {
 } from "react-native";
 
 export default function BottomNav() {
-  const pathname =
-    usePathname();
+  const pathname = usePathname();
 
-  const isActive = (
-    path: string
-  ) => pathname === path;
+  const isActive = (path: string) => pathname === path;
 
   return (
-    <View
-      style={styles.bottomNav}
-    >
+    <View style={styles.bottomNav}>
       {/* HOME */}
       <TouchableOpacity
         style={styles.navItem}
-        activeOpacity={0.7}
-        onPress={() =>
-          router.replace("/")
-        }
+        activeOpacity={0.75}
+        onPress={() => router.replace("/")}
       >
-        <Ionicons
-          name={
-            isActive("/")
-              ? "home"
-              : "home-outline"
-          }
-          size={23}
-          color={
-            isActive("/")
-              ? "#FFFFFF"
-              : "#71717A"
-          }
-        />
+        <View
+          style={[
+            styles.iconContainer,
+            isActive("/") && styles.activeIconContainer,
+          ]}
+        >
+          <Ionicons
+            name={isActive("/") ? "home" : "home-outline"}
+            size={21}
+            color={isActive("/") ? "#2563EB" : "#7B8794"}
+          />
+        </View>
 
         <Text
           style={[
             styles.navText,
-            isActive("/") &&
-              styles.navActive,
+            isActive("/") && styles.navActive,
           ]}
         >
           Home
         </Text>
       </TouchableOpacity>
 
-      {/* ADD */}
+      {/* ADD EXPENSE */}
       <TouchableOpacity
-        style={styles.centerAdd}
-        activeOpacity={0.8}
-        onPress={() =>
-          router.push(
-            "/add-expense"
-          )
-        }
+        style={styles.addWrapper}
+        activeOpacity={0.85}
+        onPress={() => router.push("/add-expense")}
       >
-        <Ionicons
-          name="add"
-          size={30}
-          color="#FFFFFF"
-        />
+        <View style={styles.centerAdd}>
+          <Ionicons
+            name="add"
+            size={30}
+            color="#FFFFFF"
+          />
+        </View>
+
+        <Text style={styles.addText}>Expense</Text>
       </TouchableOpacity>
 
       {/* INSIGHTS */}
       <TouchableOpacity
         style={styles.navItem}
-        activeOpacity={0.7}
-        onPress={() =>
-          router.replace(
-            "/insights"
-          )
-        }
+        activeOpacity={0.75}
+        onPress={() => router.replace("/insights")}
       >
-        <Ionicons
-          name={
-            isActive(
-              "/insights"
-            )
-              ? "pie-chart"
-              : "pie-chart-outline"
-          }
-          size={23}
-          color={
-            isActive(
-              "/insights"
-            )
-              ? "#FFFFFF"
-              : "#71717A"
-          }
-        />
+        <View
+          style={[
+            styles.iconContainer,
+            isActive("/insights") &&
+              styles.activeIconContainer,
+          ]}
+        >
+          <Ionicons
+            name={
+              isActive("/insights")
+                ? "pie-chart"
+                : "pie-chart-outline"
+            }
+            size={21}
+            color={
+              isActive("/insights")
+                ? "#2563EB"
+                : "#7B8794"
+            }
+          />
+        </View>
 
         <Text
           style={[
             styles.navText,
-            isActive(
-              "/insights"
-            ) &&
+            isActive("/insights") &&
               styles.navActive,
           ]}
         >
@@ -116,37 +102,35 @@ export default function BottomNav() {
       {/* BUDGETS */}
       <TouchableOpacity
         style={styles.navItem}
-        activeOpacity={0.7}
-        onPress={() =>
-          router.replace(
-            "/budgets"
-          )
-        }
+        activeOpacity={0.75}
+        onPress={() => router.replace("/budgets")}
       >
-        <Ionicons
-          name={
-            isActive(
-              "/budgets"
-            )
-              ? "wallet"
-              : "wallet-outline"
-          }
-          size={23}
-          color={
-            isActive(
-              "/budgets"
-            )
-              ? "#FFFFFF"
-              : "#71717A"
-          }
-        />
+        <View
+          style={[
+            styles.iconContainer,
+            isActive("/budgets") &&
+              styles.activeIconContainer,
+          ]}
+        >
+          <Ionicons
+            name={
+              isActive("/budgets")
+                ? "wallet"
+                : "wallet-outline"
+            }
+            size={21}
+            color={
+              isActive("/budgets")
+                ? "#2563EB"
+                : "#7B8794"
+            }
+          />
+        </View>
 
         <Text
           style={[
             styles.navText,
-            isActive(
-              "/budgets"
-            ) &&
+            isActive("/budgets") &&
               styles.navActive,
           ]}
         >
@@ -157,69 +141,105 @@ export default function BottomNav() {
   );
 }
 
-const styles =
-  StyleSheet.create({
-    bottomNav: {
-      position:
-        "absolute",
-      bottom: 20,
-      left: 20,
-      right: 20,
-      height: 68,
-      borderRadius: 22,
-      backgroundColor:
-        "#18181B",
-      borderWidth: 1,
-      borderColor:
-        "#27272A",
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      justifyContent:
-        "space-around",
-      shadowColor:
-        "#000000",
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity:
-        0.25,
-      shadowRadius:
-        16,
-      elevation: 10,
-    },
+const styles = StyleSheet.create({
+  bottomNav: {
+    position: "absolute",
+    bottom: 18,
+    left: 18,
+    right: 18,
+    height: 76,
+    borderRadius: 26,
 
-    navItem: {
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      minWidth: 60,
-    },
+    // Glassmorphism
+    backgroundColor: "rgba(255, 255, 255, 0.90)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.95)",
 
-    navText: {
-      color:
-        "#71717A",
-      fontSize: 10,
-      marginTop: 4,
-    },
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
 
-    navActive: {
-      color:
-        "#FFFFFF",
+    // Soft premium shadow
+    shadowColor: "#17324D",
+    shadowOffset: {
+      width: 0,
+      height: 8,
     },
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
 
-    centerAdd: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor:
-        "#2563EB",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+    elevation: 12,
+  },
+
+  navItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 65,
+    height: 64,
+  },
+
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeIconContainer: {
+    backgroundColor: "rgba(37, 99, 235, 0.10)",
+  },
+
+  navText: {
+    color: "#7B8794",
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 3,
+    letterSpacing: 0.1,
+  },
+
+  navActive: {
+    color: "#2563EB",
+    fontWeight: "700",
+  },
+
+  addWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 72,
+    height: 76,
+    marginTop: -18,
+  },
+
+  centerAdd: {
+    width: 54,
+    height: 54,
+    borderRadius: 19,
+
+    backgroundColor: "#2563EB",
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    // Premium blue button
+    shadowColor: "#2563EB",
+    shadowOffset: {
+      width: 0,
+      height: 7,
     },
-  });
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+
+    elevation: 8,
+
+    borderWidth: 3,
+    borderColor: "rgba(255, 255, 255, 0.95)",
+  },
+
+  addText: {
+    color: "#2563EB",
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+});
