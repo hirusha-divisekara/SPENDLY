@@ -17,6 +17,7 @@ import {
     getBudgets,
     getExpenses,
 } from "../db/database";
+import { requirePro } from "../services/proGuard";
 
 const BLUE = "#2563EB";
 const GOLD = "#B88A24";
@@ -70,6 +71,10 @@ export default function AdvancedInsightsScreen() {
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
+    if (!(await requirePro())) {
+      return;
+    }
+
     try {
       setLoading(true);
 

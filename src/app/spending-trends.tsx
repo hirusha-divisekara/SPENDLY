@@ -22,6 +22,7 @@ import Svg, {
 } from "react-native-svg";
 
 import { Expense, getExpenses } from "../db/database";
+import { requirePro } from "../services/proGuard";
 
 const BLUE = "#2563EB";
 const GOLD = "#B88A24";
@@ -44,6 +45,10 @@ export default function SpendingTrendsScreen() {
   const [period, setPeriod] = useState<Period>("30D");
 
   const loadExpenses = async () => {
+    if (!(await requirePro())) {
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await getExpenses();
@@ -61,7 +66,8 @@ export default function SpendingTrendsScreen() {
     }, [])
   );
 
-  const periodDays = period === "7D" ? 7 : period === "30D" ? 30 : 90;
+  const periodDays =
+    period === "7D" ? 7 : period === "30D" ? 30 : 90;
 
   const periodExpenses = useMemo(() => {
     const now = new Date();
@@ -85,6 +91,7 @@ export default function SpendingTrendsScreen() {
 
   const averageDaily = useMemo(() => {
     if (periodDays === 0) return 0;
+
     return totalSpent / periodDays;
   }, [totalSpent, periodDays]);
 
@@ -117,6 +124,7 @@ export default function SpendingTrendsScreen() {
 
   const chartData = useMemo(() => {
     const now = new Date();
+
     const data: {
       date: Date;
       label: string;
@@ -125,6 +133,7 @@ export default function SpendingTrendsScreen() {
 
     for (let i = periodDays - 1; i >= 0; i--) {
       const date = new Date(now);
+
       date.setDate(now.getDate() - i);
       date.setHours(0, 0, 0, 0);
 
@@ -133,11 +142,16 @@ export default function SpendingTrendsScreen() {
       const amount = periodExpenses
         .filter((expense) => {
           const expenseDate = new Date(expense.date);
-          const expenseKey = expenseDate.toISOString().split("T")[0];
+
+          const expenseKey =
+            expenseDate.toISOString().split("T")[0];
 
           return expenseKey === key;
         })
-        .reduce((sum, expense) => sum + Number(expense.amount), 0);
+        .reduce(
+          (sum, expense) => sum + Number(expense.amount),
+          0
+        );
 
       let label = "";
 
@@ -172,7 +186,9 @@ export default function SpendingTrendsScreen() {
     const paddingTop = 20;
     const paddingBottom = 30;
 
-    const usableWidth = CHART_WIDTH - paddingX * 2;
+    const usableWidth =
+      CHART_WIDTH - paddingX * 2;
+
     const usableHeight =
       CHART_HEIGHT - paddingTop - paddingBottom;
 
@@ -223,7 +239,8 @@ export default function SpendingTrendsScreen() {
     if (chartPoints.length === 0) return "";
 
     const first = chartPoints[0];
-    const last = chartPoints[chartPoints.length - 1];
+    const last =
+      chartPoints[chartPoints.length - 1];
 
     return `
       ${chartPath}
@@ -247,7 +264,9 @@ export default function SpendingTrendsScreen() {
         category,
         amount,
         percentage:
-          totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
+          totalSpent > 0
+            ? (amount / totalSpent) * 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [periodExpenses, totalSpent]);
@@ -287,24 +306,26 @@ export default function SpendingTrendsScreen() {
   }, [totalSpent, averageDaily]);
 
   const formatCurrency = (amount: number) => {
-    return `Rs. ${Math.round(amount).toLocaleString("en-LK")}`;
+    return `Rs. ${Math.round(amount).toLocaleString(
+      "en-LK"
+    )}`;
   };
 
   const formatHighestDate = (date: string) => {
     if (!date) return "—";
 
-    return new Date(`${date}T00:00:00`).toLocaleDateString(
-      "en-US",
-      {
-        day: "numeric",
-        month: "short",
-      }
-    );
+    return new Date(
+      `${date}T00:00:00`
+    ).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+    });
   };
 
   const getPeriodLabel = () => {
     if (period === "7D") return "Last 7 days";
     if (period === "30D") return "Last 30 days";
+
     return "Last 90 days";
   };
 
@@ -445,7 +466,10 @@ export default function SpendingTrendsScreen() {
                 <Text
                   style={[
                     styles.statusText,
-                    { color: spendingStatus.color },
+                    {
+                      color:
+                        spendingStatus.color,
+                    },
                   ]}
                 >
                   {spendingStatus.label}
@@ -468,6 +492,7 @@ export default function SpendingTrendsScreen() {
 
                 <View style={styles.chartLegend}>
                   <View style={styles.legendDot} />
+
                   <Text style={styles.legendText}>
                     Spending
                   </Text>
@@ -519,24 +544,29 @@ export default function SpendingTrendsScreen() {
                     </Defs>
 
                     {/* Horizontal grid lines */}
-                    {[0, 1, 2, 3].map((index) => {
-                      const y =
-                        20 +
-                        index *
-                          ((CHART_HEIGHT - 50) / 3);
+                    {[0, 1, 2, 3].map(
+                      (index) => {
+                        const y =
+                          20 +
+                          index *
+                            ((CHART_HEIGHT - 50) /
+                              3);
 
-                      return (
-                        <Line
-                          key={index}
-                          x1="16"
-                          y1={y}
-                          x2={CHART_WIDTH - 16}
-                          y2={y}
-                          stroke="#E2E8F0"
-                          strokeWidth="1"
-                        />
-                      );
-                    })}
+                        return (
+                          <Line
+                            key={index}
+                            x1="16"
+                            y1={y}
+                            x2={
+                              CHART_WIDTH - 16
+                            }
+                            y2={y}
+                            stroke="#E2E8F0"
+                            strokeWidth="1"
+                          />
+                        );
+                      }
+                    )}
 
                     {/* Area */}
                     <Path
@@ -555,28 +585,32 @@ export default function SpendingTrendsScreen() {
                     />
 
                     {/* Points */}
-                    {chartPoints.map((point, index) => {
-                      const shouldShowPoint =
-                        period === "7D" ||
-                        index === chartPoints.length - 1 ||
-                        point.amount > 0;
+                    {chartPoints.map(
+                      (point, index) => {
+                        const shouldShowPoint =
+                          period === "7D" ||
+                          index ===
+                            chartPoints.length -
+                              1 ||
+                          point.amount > 0;
 
-                      if (!shouldShowPoint) {
-                        return null;
+                        if (!shouldShowPoint) {
+                          return null;
+                        }
+
+                        return (
+                          <Circle
+                            key={index}
+                            cx={point.x}
+                            cy={point.y}
+                            r="4"
+                            fill={WHITE}
+                            stroke={BLUE}
+                            strokeWidth="2"
+                          />
+                        );
                       }
-
-                      return (
-                        <Circle
-                          key={index}
-                          cx={point.x}
-                          cy={point.y}
-                          r="4"
-                          fill={WHITE}
-                          stroke={BLUE}
-                          strokeWidth="2"
-                        />
-                      );
-                    })}
+                    )}
                   </Svg>
 
                   <View style={styles.chartLabels}>
@@ -587,7 +621,8 @@ export default function SpendingTrendsScreen() {
                     <Text style={styles.chartLabel}>
                       {chartPoints.length > 0
                         ? chartPoints[
-                            chartPoints.length - 1
+                            chartPoints.length -
+                              1
                           ].label
                         : ""}
                     </Text>
@@ -612,7 +647,9 @@ export default function SpendingTrendsScreen() {
                 </Text>
 
                 <Text style={styles.statValue}>
-                  {formatCurrency(averageDaily)}
+                  {formatCurrency(
+                    averageDaily
+                  )}
                 </Text>
               </View>
 
@@ -630,11 +667,15 @@ export default function SpendingTrendsScreen() {
                 </Text>
 
                 <Text style={styles.statValue}>
-                  {formatCurrency(highestDay.amount)}
+                  {formatCurrency(
+                    highestDay.amount
+                  )}
                 </Text>
 
                 <Text style={styles.statDate}>
-                  {formatHighestDate(highestDay.date)}
+                  {formatHighestDate(
+                    highestDay.date
+                  )}
                 </Text>
               </View>
             </View>
@@ -643,11 +684,15 @@ export default function SpendingTrendsScreen() {
             <View style={styles.categoryCard}>
               <View style={styles.sectionTopRow}>
                 <View>
-                  <Text style={styles.sectionTitle}>
+                  <Text
+                    style={styles.sectionTitle}
+                  >
                     Top spending category
                   </Text>
 
-                  <Text style={styles.sectionSubtitle}>
+                  <Text
+                    style={styles.sectionSubtitle}
+                  >
                     Where most of your money went
                   </Text>
                 </View>
@@ -661,8 +706,16 @@ export default function SpendingTrendsScreen() {
 
               {topCategory ? (
                 <>
-                  <View style={styles.topCategoryRow}>
-                    <View style={styles.topCategoryIcon}>
+                  <View
+                    style={
+                      styles.topCategoryRow
+                    }
+                  >
+                    <View
+                      style={
+                        styles.topCategoryIcon
+                      }
+                    >
                       <Ionicons
                         name="wallet-outline"
                         size={21}
@@ -670,17 +723,35 @@ export default function SpendingTrendsScreen() {
                       />
                     </View>
 
-                    <View style={styles.topCategoryContent}>
-                      <Text style={styles.topCategoryName}>
+                    <View
+                      style={
+                        styles.topCategoryContent
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.topCategoryName
+                        }
+                      >
                         {topCategory.category}
                       </Text>
 
-                      <Text style={styles.topCategoryAmount}>
-                        {formatCurrency(topCategory.amount)}
+                      <Text
+                        style={
+                          styles.topCategoryAmount
+                        }
+                      >
+                        {formatCurrency(
+                          topCategory.amount
+                        )}
                       </Text>
                     </View>
 
-                    <Text style={styles.topCategoryPercentage}>
+                    <Text
+                      style={
+                        styles.topCategoryPercentage
+                      }
+                    >
                       {Math.round(
                         topCategory.percentage
                       )}
@@ -688,7 +759,9 @@ export default function SpendingTrendsScreen() {
                     </Text>
                   </View>
 
-                  <View style={styles.progressTrack}>
+                  <View
+                    style={styles.progressTrack}
+                  >
                     <View
                       style={[
                         styles.progressFill,
@@ -711,38 +784,75 @@ export default function SpendingTrendsScreen() {
 
             {/* Category Breakdown */}
             {categoryTotals.length > 0 && (
-              <View style={styles.breakdownCard}>
+              <View
+                style={styles.breakdownCard}
+              >
                 <Text style={styles.sectionTitle}>
                   Category breakdown
                 </Text>
 
-                <Text style={styles.sectionSubtitle}>
+                <Text
+                  style={styles.sectionSubtitle}
+                >
                   How your spending is distributed
                 </Text>
 
-                <View style={styles.breakdownList}>
+                <View
+                  style={styles.breakdownList}
+                >
                   {categoryTotals
                     .slice(0, 5)
                     .map((item) => (
                       <View
                         key={item.category}
-                        style={styles.breakdownItem}
+                        style={
+                          styles.breakdownItem
+                        }
                       >
-                        <View style={styles.breakdownLeft}>
-                          <View style={styles.breakdownDot} />
+                        <View
+                          style={
+                            styles.breakdownLeft
+                          }
+                        >
+                          <View
+                            style={
+                              styles.breakdownDot
+                            }
+                          />
 
-                          <Text style={styles.breakdownCategory}>
+                          <Text
+                            style={
+                              styles.breakdownCategory
+                            }
+                          >
                             {item.category}
                           </Text>
                         </View>
 
-                        <View style={styles.breakdownRight}>
-                          <Text style={styles.breakdownAmount}>
-                            {formatCurrency(item.amount)}
+                        <View
+                          style={
+                            styles.breakdownRight
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.breakdownAmount
+                            }
+                          >
+                            {formatCurrency(
+                              item.amount
+                            )}
                           </Text>
 
-                          <Text style={styles.breakdownPercentage}>
-                            {Math.round(item.percentage)}%
+                          <Text
+                            style={
+                              styles.breakdownPercentage
+                            }
+                          >
+                            {Math.round(
+                              item.percentage
+                            )}
+                            %
                           </Text>
                         </View>
                       </View>
@@ -761,7 +871,9 @@ export default function SpendingTrendsScreen() {
                 />
               </View>
 
-              <View style={styles.insightContent}>
+              <View
+                style={styles.insightContent}
+              >
                 <Text style={styles.insightLabel}>
                   SPENDLY PRO INSIGHT
                 </Text>
@@ -772,7 +884,9 @@ export default function SpendingTrendsScreen() {
                     : "Start tracking to unlock insights."}
                 </Text>
 
-                <Text style={styles.insightDescription}>
+                <Text
+                  style={styles.insightDescription}
+                >
                   {topCategory
                     ? `${topCategory.category} accounts for ${Math.round(
                         topCategory.percentage

@@ -19,6 +19,7 @@ import {
     Expense,
     getExpenses,
 } from "../db/database";
+import { requirePro } from "../services/proGuard";
 
 const BLUE = "#2563EB";
 const GOLD = "#B88A24";
@@ -26,42 +27,11 @@ const BG = "#F5F8FC";
 const TEXT = "#0F172A";
 const MUTED = "#64748B";
 const WHITE = "#FFFFFF";
+const BORDER = "rgba(148,163,184,0.18)";
+const GREEN = "#16A34A";
+const RED = "#DC2626";
 
-const BORDER =
-  "rgba(148,163,184,0.18)";
-
-type DateFilter =
-  | "month"
-  | "lastMonth"
-  | "threeMonths"
-  | "all";
-
-const DATE_FILTERS: {
-  id: DateFilter;
-  label: string;
-}[] = [
-  {
-    id: "month",
-    label: "This Month",
-  },
-  {
-    id: "lastMonth",
-    label: "Last Month",
-  },
-  {
-    id: "threeMonths",
-    label: "3 Months",
-  },
-  {
-    id: "all",
-    label: "All Time",
-  },
-];
-
-const CATEGORY_COLORS: Record<
-  string,
-  string
-> = {
+const CATEGORY_COLORS: Record<string, string> = {
   Food: "#F97316",
   Transport: "#3B82F6",
   Shopping: "#EC4899",
@@ -71,77 +41,68 @@ const CATEGORY_COLORS: Record<
   Other: "#64748B",
 };
 
-const CATEGORY_ICONS: Record<
-  string,
-  any
-> = {
+const CATEGORY_ICONS: Record<string, any> = {
   Food: "restaurant-outline",
   Transport: "car-outline",
   Shopping: "bag-handle-outline",
   Bills: "receipt-outline",
-  Entertainment:
-    "game-controller-outline",
+  Entertainment: "game-controller-outline",
   Health: "medkit-outline",
-  Other:
-    "ellipsis-horizontal-circle-outline",
+  Other: "ellipsis-horizontal-circle-outline",
 };
 
+type Period = {
+  key: string;
+  label: string;
+};
+
+const PERIODS: Period[] = [
+  {
+    key: "this-month",
+    label: "This Month",
+  },
+  {
+    key: "last-month",
+    label: "Last Month",
+  },
+  {
+    key: "3-months",
+    label: "3 Months",
+  },
+  {
+    key: "all-time",
+    label: "All Time",
+  },
+];
+
 export default function ReportsScreen() {
-  const [
-    expenses,
-    setExpenses,
-  ] = useState<Expense[]>([]);
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    dateFilter,
-    setDateFilter,
-  ] =
-    useState<DateFilter>(
-      "month"
-    );
-
-  const [
-    categoryFilter,
-    setCategoryFilter,
-  ] =
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] =
+    useState("this-month");
+  const [selectedCategory, setSelectedCategory] =
     useState("All");
 
-  const [
-    exporting,
-    setExporting,
-  ] = useState(false);
+  const loadExpenses = async () => {
+    if (!(await requirePro())) {
+      return;
+    }
 
-  /*
-   * LOAD EXPENSES
-   */
-  const loadExpenses =
-    async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const data =
-          await getExpenses();
+      const data = await getExpenses();
 
-        setExpenses(data);
-      } catch (error) {
-        console.error(
-          "REPORTS LOAD ERROR:",
-          error
-        );
-
-        Alert.alert(
-          "Unable to load reports",
-          "Something went wrong while loading your expenses."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setExpenses(data);
+    } catch (error) {
+      console.error(
+        "❌ REPORTS LOAD ERROR:",
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -149,302 +110,162 @@ export default function ReportsScreen() {
     }, [])
   );
 
-  /*
-   * FORMAT LKR
-   */
-  const formatAmount =
-    (
-      amount: number
-    ) => {
-      return `Rs. ${amount.toLocaleString(
-        "en-LK",
-        {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }
-      )}`;
-    };
+  const formatAmount = (amount: number) => {
+    return `Rs. ${Math.round(
+      amount
+    ).toLocaleString()}`;
+  };
 
-  /*
-   * FORMAT DATE
-   */
-  const formatDate =
-    (
-      dateString: string
-    ) => {
-      const date =
-        new Date(
-          dateString
-        );
+  const getMonthKey = (date: Date) => {
+    return `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}`;
+  };
 
-      if (
-        Number.isNaN(
-          date.getTime()
+  const currentMonthKey = useMemo(() => {
+    return getMonthKey(new Date());
+  }, []);
+
+  const previousMonthKey = useMemo(() => {
+    const date = new Date();
+
+    date.setMonth(
+      date.getMonth() - 1
+    );
+
+    return getMonthKey(date);
+  }, []);
+
+  const threeMonthsAgo = useMemo(() => {
+    const date = new Date();
+
+    date.setMonth(
+      date.getMonth() - 2
+    );
+
+    return date;
+  }, []);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        expenses.map(
+          (expense) =>
+            expense.category
         )
-      ) {
-        return dateString;
-      }
+      )
+    );
 
-      return date.toLocaleDateString(
-        "en-LK",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
-      );
-    };
+    return [
+      "All",
+      ...unique.sort(),
+    ];
+  }, [expenses]);
 
-  /*
-   * CATEGORY COLOR
-   */
-  const getCategoryColor =
-    (
-      category: string
-    ) => {
-      return (
-        CATEGORY_COLORS[
-          category
-        ] ||
-        "#64748B"
-      );
-    };
+  const periodExpenses = useMemo(() => {
+    const now = new Date();
 
-  /*
-   * CATEGORY ICON
-   */
-  const getCategoryIcon =
-    (
-      category: string
-    ): any => {
-      return (
-        CATEGORY_ICONS[
-          category
-        ] ||
-        "pricetag-outline"
-      );
-    };
-
-  /*
-   * CATEGORY LIST
-   *
-   * This is generated from
-   * actual expenses, so
-   * custom categories work.
-   */
-  const categories =
-    useMemo(() => {
-      const unique =
-        Array.from(
-          new Set(
-            expenses.map(
-              (expense) =>
-                expense.category
-            )
-          )
+    return expenses.filter(
+      (expense) => {
+        const date = new Date(
+          expense.date
         );
 
-      return [
-        "All",
-        ...unique.sort(
-          (a, b) =>
-            a.localeCompare(
-              b
-            )
-        ),
-      ];
-    }, [expenses]);
+        let matchesPeriod =
+          true;
 
-  /*
-   * DATE FILTER
-   */
-  const filteredByDate =
-    useMemo(() => {
-      const now =
-        new Date();
+        switch (
+          selectedPeriod
+        ) {
+          case "this-month":
+            matchesPeriod =
+              getMonthKey(
+                date
+              ) ===
+              currentMonthKey;
+            break;
 
-      return expenses.filter(
-        (expense) => {
-          const expenseDate =
-            new Date(
-              expense.date
-            );
+          case "last-month":
+            matchesPeriod =
+              getMonthKey(
+                date
+              ) ===
+              previousMonthKey;
+            break;
 
-          if (
-            Number.isNaN(
-              expenseDate.getTime()
-            )
-          ) {
-            return false;
-          }
+          case "3-months":
+            matchesPeriod =
+              date >=
+              threeMonthsAgo;
+            break;
 
-          /*
-           * ALL TIME
-           */
-          if (
-            dateFilter ===
-            "all"
-          ) {
-            return true;
-          }
-
-          /*
-           * THIS MONTH
-           */
-          if (
-            dateFilter ===
-            "month"
-          ) {
-            return (
-              expenseDate.getMonth() ===
-                now.getMonth() &&
-              expenseDate.getFullYear() ===
-                now.getFullYear()
-            );
-          }
-
-          /*
-           * LAST MONTH
-           */
-          if (
-            dateFilter ===
-            "lastMonth"
-          ) {
-            const lastMonth =
-              new Date(
-                now.getFullYear(),
-                now.getMonth() -
-                  1,
-                1
-              );
-
-            return (
-              expenseDate.getMonth() ===
-                lastMonth.getMonth() &&
-              expenseDate.getFullYear() ===
-                lastMonth.getFullYear()
-            );
-          }
-
-          /*
-           * LAST 3 MONTHS
-           */
-          if (
-            dateFilter ===
-            "threeMonths"
-          ) {
-            const threeMonthsAgo =
-              new Date(
-                now
-              );
-
-            threeMonthsAgo.setMonth(
-              now.getMonth() -
-                2
-            );
-
-            threeMonthsAgo.setHours(
-              0,
-              0,
-              0,
-              0
-            );
-
-            return (
-              expenseDate >=
-              threeMonthsAgo
-            );
-          }
-
-          return true;
+          case "all-time":
+            matchesPeriod =
+              true;
+            break;
         }
-      );
-    }, [
-      expenses,
-      dateFilter,
-    ]);
 
-  /*
-   * CATEGORY FILTER
-   */
-  const filteredExpenses =
-    useMemo(() => {
-      if (
-        categoryFilter ===
-        "All"
-      ) {
-        return filteredByDate;
-      }
-
-      return filteredByDate.filter(
-        (expense) =>
+        const matchesCategory =
+          selectedCategory ===
+            "All" ||
           expense.category ===
-          categoryFilter
-      );
-    }, [
-      filteredByDate,
-      categoryFilter,
-    ]);
+            selectedCategory;
 
-  /*
-   * TOTAL
-   */
-  const totalSpent =
+        return (
+          matchesPeriod &&
+          matchesCategory
+        );
+      }
+    );
+  }, [
+    expenses,
+    selectedPeriod,
+    selectedCategory,
+    currentMonthKey,
+    previousMonthKey,
+    threeMonthsAgo,
+  ]);
+
+  const totalSpending =
     useMemo(() => {
-      return filteredExpenses.reduce(
-        (
-          total,
-          expense
-        ) =>
-          total +
+      return periodExpenses.reduce(
+        (sum, expense) =>
+          sum +
           expense.amount,
         0
       );
-    }, [
-      filteredExpenses,
-    ]);
+    }, [periodExpenses]);
 
-  /*
-   * TRANSACTION COUNT
-   */
   const transactionCount =
-    filteredExpenses.length;
+    periodExpenses.length;
 
-  /*
-   * AVERAGE
-   */
   const averageTransaction =
-    transactionCount >
-    0
-      ? totalSpent /
+    transactionCount > 0
+      ? totalSpending /
         transactionCount
       : 0;
 
-  /*
-   * CATEGORY BREAKDOWN
-   */
-  const categoryData =
+  const categoryBreakdown =
     useMemo(() => {
-      const totals: Record<
+      const map: Record<
         string,
         number
       > = {};
 
-      filteredExpenses.forEach(
+      periodExpenses.forEach(
         (expense) => {
-          totals[
+          map[
             expense.category
           ] =
-            (totals[
+            (map[
               expense.category
-            ] ||
-              0) +
+            ] || 0) +
             expense.amount;
         }
       );
 
       return Object.entries(
-        totals
+        map
       )
         .map(
           ([
@@ -454,10 +275,10 @@ export default function ReportsScreen() {
             category,
             amount,
             percentage:
-              totalSpent >
+              totalSpending >
               0
                 ? (amount /
-                    totalSpent) *
+                    totalSpending) *
                   100
                 : 0,
           })
@@ -468,162 +289,144 @@ export default function ReportsScreen() {
             a.amount
         );
     }, [
-      filteredExpenses,
-      totalSpent,
+      periodExpenses,
+      totalSpending,
     ]);
 
-  /*
-   * TOP CATEGORY
-   */
   const topCategory =
-    categoryData[0];
+    categoryBreakdown[0];
 
-  /*
-   * PERIOD LABEL
-   */
-  const periodLabel =
-    DATE_FILTERS.find(
-      (item) =>
-        item.id ===
-        dateFilter
-    )?.label ||
-    "All Time";
-
-  /*
-   * CSV ESCAPE
-   */
-  const escapeCsv =
-    (
-      value: string
-    ) => {
-      const stringValue =
-        String(
-          value
-        );
-
-      if (
-        stringValue.includes(
-          ","
-        ) ||
-        stringValue.includes(
-          '"'
-        ) ||
-        stringValue.includes(
-          "\n"
-        )
-      ) {
-        return `"${stringValue.replace(
-          /"/g,
-          '""'
-        )}"`;
-      }
-
-      return stringValue;
-    };
-
-  /*
-   * CREATE CSV
-   */
-  const createCsv =
-    () => {
-      const header =
-        [
-          "Date",
-          "Category",
-          "Note",
-          "Amount (LKR)",
-        ].join(
-          ","
-        );
-
-      const rows =
-        filteredExpenses.map(
-          (
-            expense
-          ) => {
-            return [
-              escapeCsv(
-                formatDate(
-                  expense.date
-                )
-              ),
-              escapeCsv(
-                expense.category
-              ),
-              escapeCsv(
-                expense.note ||
-                  ""
-              ),
-              expense.amount.toFixed(
-                2
-              ),
-            ].join(
-              ","
-            );
-          }
-        );
-
+  const latestTransactions =
+    useMemo(() => {
       return [
-        header,
-        ...rows,
-      ].join(
-        "\n"
-      );
-    };
+        ...periodExpenses,
+      ]
+        .sort(
+          (a, b) =>
+            new Date(
+              b.date
+            ).getTime() -
+            new Date(
+              a.date
+            ).getTime()
+        )
+        .slice(0, 30);
+    }, [
+      periodExpenses,
+    ]);
 
-  /*
-   * EXPORT
-   */
+  const periodLabel =
+    PERIODS.find(
+      (period) =>
+        period.key ===
+        selectedPeriod
+    )?.label ||
+    "This Month";
+
+  const formatDate = (
+    dateString: string
+  ) => {
+    const date =
+      new Date(
+        dateString
+      );
+
+    return date.toLocaleDateString(
+      "en-US",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }
+    );
+  };
+
+  const escapeCsv = (
+    value: string
+  ) => {
+    return `"${value
+      .replace(
+        /"/g,
+        '""'
+      )}"`;
+  };
+
+  const generateCsv = () => {
+    const header = [
+      "Date",
+      "Category",
+      "Amount",
+      "Note",
+    ];
+
+    const rows =
+      latestTransactions.map(
+        (expense) => [
+          formatDate(
+            expense.date
+          ),
+          expense.category,
+          expense.amount.toString(),
+          expense.note ||
+            "",
+        ]
+      );
+
+    return [
+      header.join(","),
+      ...rows.map(
+        (row) =>
+          [
+            escapeCsv(
+              row[0]
+            ),
+            escapeCsv(
+              row[1]
+            ),
+            row[2],
+            escapeCsv(
+              row[3]
+            ),
+          ].join(
+            ","
+          )
+      ),
+    ].join(
+      "\n"
+    );
+  };
+
   const handleExport =
     async () => {
-      if (
-        filteredExpenses.length ===
-        0
-      ) {
-        Alert.alert(
-          "Nothing to export",
-          "There are no expenses in the selected report."
-        );
-
-        return;
-      }
-
       try {
-        setExporting(
-          true
-        );
+        if (
+          periodExpenses.length ===
+          0
+        ) {
+          Alert.alert(
+            "No Data",
+            "There are no transactions to export for the selected filters."
+          );
+
+          return;
+        }
 
         const csv =
-          createCsv();
+          generateCsv();
 
-        const fileName =
-          `Spendly_Report_${Date.now()}.csv`;
+        const fileName = `Spendly_Report_${Date.now()}.csv`;
 
-        const fileUri =
-          `${FileSystem.cacheDirectory}${fileName}`;
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
         await FileSystem.writeAsStringAsync(
           fileUri,
           csv,
           {
             encoding:
-              FileSystem.EncodingType.UTF8,
+              FileSystem.EncodingType
+                .UTF8,
           }
         );
-
-        const canShare =
-          await Sharing.isAvailableAsync();
-
-        if (
-          !canShare
-        ) {
-          Alert.alert(
-            "Export created",
-            "The report was generated, but sharing is not available on this device."
-          );
-
-          return;
-        }
 
         await Sharing.shareAsync(
           fileUri,
@@ -632,33 +435,36 @@ export default function ReportsScreen() {
               "text/csv",
             dialogTitle:
               "Share Spendly Report",
-            UTI:
-              "public.comma-separated-values-text",
+            UTI: "public.comma-separated-values-text",
           }
         );
       } catch (error) {
         console.error(
-          "REPORT EXPORT ERROR:",
+          "❌ EXPORT ERROR:",
           error
         );
 
         Alert.alert(
-          "Export failed",
-          "Spendly could not create the report."
-        );
-      } finally {
-        setExporting(
-          false
+          "Export Failed",
+          "Something went wrong while creating your report."
         );
       }
     };
 
-  /*
-   * LOADING
-   */
-  if (
-    loading
-  ) {
+  const handleTransactionPress =
+    (
+      id: number
+    ) => {
+      router.push({
+        pathname:
+          "/edit-expense",
+        params: {
+          id: id.toString(),
+        },
+      });
+    };
+
+  if (loading) {
     return (
       <SafeAreaView
         style={
@@ -676,15 +482,19 @@ export default function ReportsScreen() {
             }
           >
             <Ionicons
-              name="bar-chart-outline"
+              name="document-text-outline"
               size={28}
-              color={BLUE}
+              color={
+                BLUE
+              }
             />
           </View>
 
           <ActivityIndicator
             size="small"
-            color={BLUE}
+            color={
+              BLUE
+            }
           />
 
           <Text
@@ -692,8 +502,7 @@ export default function ReportsScreen() {
               styles.loadingText
             }
           >
-            Preparing your
-            report...
+            Preparing your report...
           </Text>
         </View>
       </SafeAreaView>
@@ -702,18 +511,19 @@ export default function ReportsScreen() {
 
   return (
     <SafeAreaView
-      style={styles.safeArea}
+      style={
+        styles.safeArea
+      }
     >
-      {/* Background */}
       <View
         style={
-          styles.backgroundOrbOne
+          styles.orbTop
         }
       />
 
       <View
         style={
-          styles.backgroundOrbTwo
+          styles.orbBottom
         }
       />
 
@@ -722,13 +532,10 @@ export default function ReportsScreen() {
           false
         }
         contentContainerStyle={
-          styles.content
+          styles.container
         }
       >
-        {/* ========================= */}
         {/* HEADER */}
-        {/* ========================= */}
-
         <View
           style={
             styles.header
@@ -746,9 +553,11 @@ export default function ReportsScreen() {
             }
           >
             <Ionicons
-              name="chevron-back"
-              size={23}
-              color={TEXT}
+              name="arrow-back"
+              size={22}
+              color={
+                TEXT
+              }
             />
           </TouchableOpacity>
 
@@ -759,95 +568,308 @@ export default function ReportsScreen() {
           >
             <Text
               style={
-                styles.eyebrow
+                styles.headerTitle
               }
             >
-              SPENDLY PRO
+              Reports & Export
             </Text>
 
             <Text
               style={
-                styles.title
+                styles.headerSubtitle
               }
             >
-              Reports
-            </Text>
-
-            <Text
-              style={
-                styles.subtitle
-              }
-            >
-              Your spending,
-              clearly understood.
+              Understand and export your spending
             </Text>
           </View>
 
           <View
             style={
-              styles.headerBadge
+              styles.proBadge
             }
           >
             <Ionicons
-              name="bar-chart-outline"
-              size={19}
-              color={GOLD}
+              name="diamond"
+              size={15}
+              color={
+                GOLD
+              }
             />
           </View>
         </View>
 
-        {/* ========================= */}
+        {/* HERO */}
+        <View
+          style={
+            styles.heroCard
+          }
+        >
+          <View
+            style={
+              styles.heroGlowOne
+            }
+          />
+
+          <View
+            style={
+              styles.heroGlowTwo
+            }
+          />
+
+          <View
+            style={
+              styles.heroTop
+            }
+          >
+            <View
+              style={
+                styles.heroContent
+              }
+            >
+              <Text
+                style={
+                  styles.eyebrow
+                }
+              >
+                SPENDLY PRO
+              </Text>
+
+              <Text
+                style={
+                  styles.heroTitle
+                }
+              >
+                Your money,
+                {"\n"}
+                clearly reported.
+              </Text>
+
+              <Text
+                style={
+                  styles.heroDescription
+                }
+              >
+                Review your spending and
+                export a clean report whenever
+                you need it.
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.heroIcon
+              }
+            >
+              <Ionicons
+                name="document-text"
+                size={28}
+                color={
+                  WHITE
+                }
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* PERIOD FILTER */}
+        <View
+          style={
+            styles.sectionHeader
+          }
+        >
+          <View>
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Report Period
+            </Text>
+
+            <Text
+              style={
+                styles.sectionSubtitle
+              }
+            >
+              Choose the data you want to analyse
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={
+            false
+          }
+          contentContainerStyle={
+            styles.periodScroll
+          }
+        >
+          {PERIODS.map(
+            (period) => {
+              const active =
+                selectedPeriod ===
+                period.key;
+
+              return (
+                <TouchableOpacity
+                  key={
+                    period.key
+                  }
+                  style={[
+                    styles.periodChip,
+                    active &&
+                      styles.periodChipActive,
+                  ]}
+                  onPress={() =>
+                    setSelectedPeriod(
+                      period.key
+                    )
+                  }
+                  activeOpacity={
+                    0.8
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.periodChipText,
+                      active &&
+                        styles.periodChipTextActive,
+                    ]}
+                  >
+                    {
+                      period.label
+                    }
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+          )}
+        </ScrollView>
+
+        {/* CATEGORY FILTER */}
+        {categories.length >
+          1 && (
+          <>
+            <View
+              style={
+                styles.sectionHeaderSmall
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Category
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={
+                false
+              }
+              contentContainerStyle={
+                styles.periodScroll
+              }
+            >
+              {categories.map(
+                (
+                  category
+                ) => {
+                  const active =
+                    selectedCategory ===
+                    category;
+
+                  return (
+                    <TouchableOpacity
+                      key={
+                        category
+                      }
+                      style={[
+                        styles.categoryChip,
+                        active &&
+                          styles.categoryChipActive,
+                      ]}
+                      onPress={() =>
+                        setSelectedCategory(
+                          category
+                        )
+                      }
+                      activeOpacity={
+                        0.8
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.categoryChipText,
+                          active &&
+                            styles.categoryChipTextActive,
+                        ]}
+                      >
+                        {
+                          category
+                        }
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
+              )}
+            </ScrollView>
+          </>
+        )}
+
         {/* SUMMARY */}
-        {/* ========================= */}
+        <View
+          style={
+            styles.sectionHeader
+          }
+        >
+          <View>
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Spending Summary
+            </Text>
+
+            <Text
+              style={
+                styles.sectionSubtitle
+              }
+            >
+              {periodLabel}
+              {selectedCategory !==
+                "All" &&
+                ` • ${selectedCategory}`}
+            </Text>
+          </View>
+        </View>
 
         <View
           style={
             styles.summaryCard
           }
         >
-          <View
+          <Text
             style={
-              styles.summaryTop
+              styles.summaryLabel
             }
           >
-            <View>
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                TOTAL SPENDING
-              </Text>
+            TOTAL SPENDING
+          </Text>
 
-              <Text
-                style={
-                  styles.totalAmount
-                }
-              >
-                {formatAmount(
-                  totalSpent
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.summaryIcon
-              }
-            >
-              <Ionicons
-                name="wallet-outline"
-                size={24}
-                color={BLUE}
-              />
-            </View>
-          </View>
-
-          <View
+          <Text
             style={
-              styles.summaryDivider
+              styles.summaryAmount
             }
-          />
+          >
+            {formatAmount(
+              totalSpending
+            )}
+          </Text>
 
           <View
             style={
@@ -856,656 +878,350 @@ export default function ReportsScreen() {
           >
             <View
               style={
-                styles.statItem
-              }
-            >
-              <Text
-                style={
-                  styles.statValue
-                }
-              >
-                {
-                  transactionCount
-                }
-              </Text>
-
-              <Text
-                style={
-                  styles.statLabel
-                }
-              >
-                Transactions
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.statDivider
-              }
-            />
-
-            <View
-              style={
-                styles.statItem
-              }
-            >
-              <Text
-                style={
-                  styles.statValue
-                }
-              >
-                {formatAmount(
-                  averageTransaction
-                )}
-              </Text>
-
-              <Text
-                style={
-                  styles.statLabel
-                }
-              >
-                Average
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.statDivider
-              }
-            />
-
-            <View
-              style={
-                styles.statItem
-              }
-            >
-              <Text
-                numberOfLines={
-                  1
-                }
-                style={
-                  styles.statValue
-                }
-              >
-                {topCategory
-                  ? topCategory.category
-                  : "—"}
-              </Text>
-
-              <Text
-                style={
-                  styles.statLabel
-                }
-              >
-                Top Category
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ========================= */}
-        {/* DATE FILTER */}
-        {/* ========================= */}
-
-        <View
-          style={
-            styles.section
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            Report Period
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterRow
-            }
-          >
-            {DATE_FILTERS.map(
-              (
-                filter
-              ) => {
-                const active =
-                  dateFilter ===
-                  filter.id;
-
-                return (
-                  <TouchableOpacity
-                    key={
-                      filter.id
-                    }
-                    style={[
-                      styles.filterChip,
-                      active &&
-                        styles.filterChipActive,
-                    ]}
-                    onPress={() => {
-                      setDateFilter(
-                        filter.id
-                      );
-
-                      setCategoryFilter(
-                        "All"
-                      );
-                    }}
-                    activeOpacity={
-                      0.8
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.filterText,
-                        active &&
-                          styles.filterTextActive,
-                      ]}
-                    >
-                      {
-                        filter.label
-                      }
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-            )}
-          </ScrollView>
-        </View>
-
-        {/* ========================= */}
-        {/* CATEGORY FILTER */}
-        {/* ========================= */}
-
-        <View
-          style={
-            styles.section
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            Category
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterRow
-            }
-          >
-            {categories.map(
-              (
-                category
-              ) => {
-                const active =
-                  categoryFilter ===
-                  category;
-
-                return (
-                  <TouchableOpacity
-                    key={
-                      category
-                    }
-                    style={[
-                      styles.categoryChip,
-                      active &&
-                        styles.categoryChipActive,
-                    ]}
-                    onPress={() =>
-                      setCategoryFilter(
-                        category
-                      )
-                    }
-                    activeOpacity={
-                      0.8
-                    }
-                  >
-                    {category !==
-                      "All" && (
-                      <Ionicons
-                        name={getCategoryIcon(
-                          category
-                        )}
-                        size={
-                          14
-                        }
-                        color={
-                          active
-                            ? WHITE
-                            : getCategoryColor(
-                                category
-                              )
-                        }
-                      />
-                    )}
-
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        active &&
-                          styles.categoryChipTextActive,
-                      ]}
-                    >
-                      {
-                        category
-                      }
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }
-            )}
-          </ScrollView>
-        </View>
-
-        {/* ========================= */}
-        {/* BREAKDOWN */}
-        {/* ========================= */}
-
-        <View
-          style={
-            styles.glassCard
-          }
-        >
-          <View
-            style={
-              styles.cardHeader
-            }
-          >
-            <View>
-              <Text
-                style={
-                  styles.cardTitle
-                }
-              >
-                Spending Breakdown
-              </Text>
-
-              <Text
-                style={
-                  styles.cardSubtitle
-                }
-              >
-                {
-                  periodLabel
-                }
-              </Text>
-            </View>
-
-            <Ionicons
-              name="pie-chart-outline"
-              size={21}
-              color={BLUE}
-            />
-          </View>
-
-          {categoryData.length ===
-          0 ? (
-            <View
-              style={
-                styles.emptyBreakdown
+                styles.summaryStat
               }
             >
               <View
                 style={
-                  styles.emptyIcon
+                  styles.summaryStatIcon
                 }
               >
                 <Ionicons
-                  name="analytics-outline"
-                  size={28}
-                  color={MUTED}
+                  name="receipt-outline"
+                  size={16}
+                  color={
+                    BLUE
+                  }
                 />
               </View>
 
-              <Text
+              <View>
+                <Text
+                  style={
+                    styles.summaryStatLabel
+                  }
+                >
+                  Transactions
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryStatValue
+                  }
+                >
+                  {
+                    transactionCount
+                  }
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={
+                styles.summaryDivider
+              }
+            />
+
+            <View
+              style={
+                styles.summaryStat
+              }
+            >
+              <View
                 style={
-                  styles.emptyTitle
+                  styles.summaryStatIcon
                 }
               >
-                No spending data
+                <Ionicons
+                  name="calculator-outline"
+                  size={16}
+                  color={
+                    BLUE
+                  }
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={
+                    styles.summaryStatLabel
+                  }
+                >
+                  Average
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryStatValue
+                  }
+                >
+                  {formatAmount(
+                    averageTransaction
+                  )}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* TOP CATEGORY */}
+        {topCategory && (
+          <View
+            style={
+              styles.topCategoryCard
+            }
+          >
+            <View
+              style={
+                styles.topCategoryIcon
+              }
+            >
+              <Ionicons
+                name={
+                  CATEGORY_ICONS[
+                    topCategory.category
+                  ] ||
+                  CATEGORY_ICONS.Other
+                }
+                size={22}
+                color={
+                  GOLD
+                }
+              />
+            </View>
+
+            <View
+              style={
+                styles.topCategoryContent
+              }
+            >
+              <Text
+                style={
+                  styles.topCategoryLabel
+                }
+              >
+                TOP CATEGORY
               </Text>
 
               <Text
                 style={
-                  styles.emptyText
+                  styles.topCategoryName
                 }
               >
-                Add expenses to
-                generate your
-                report.
+                {
+                  topCategory.category
+                }
+              </Text>
+
+              <Text
+                style={
+                  styles.topCategoryAmount
+                }
+              >
+                {formatAmount(
+                  topCategory.amount
+                )}{" "}
+                •{" "}
+                {Math.round(
+                  topCategory.percentage
+                )}
+                % of spending
               </Text>
             </View>
-          ) : (
-            categoryData.map(
+          </View>
+        )}
+
+        {/* CATEGORY BREAKDOWN */}
+        <View
+          style={
+            styles.sectionHeader
+          }
+        >
+          <View>
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Category Breakdown
+            </Text>
+
+            <Text
+              style={
+                styles.sectionSubtitle
+              }
+            >
+              Your spending distribution
+            </Text>
+          </View>
+        </View>
+
+        {categoryBreakdown.length ===
+        0 ? (
+          <View
+            style={
+              styles.emptyCard
+            }
+          >
+            <View
+              style={
+                styles.emptyIcon
+              }
+            >
+              <Ionicons
+                name="bar-chart-outline"
+                size={25}
+                color={
+                  BLUE
+                }
+              />
+            </View>
+
+            <Text
+              style={
+                styles.emptyTitle
+              }
+            >
+              No spending data
+            </Text>
+
+            <Text
+              style={
+                styles.emptyText
+              }
+            >
+              There are no transactions for the selected
+              filters.
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={
+              styles.glassCard
+            }
+          >
+            {categoryBreakdown.map(
               (
-                item
+                item,
+                index
               ) => {
                 const color =
-                  getCategoryColor(
+                  CATEGORY_COLORS[
                     item.category
-                  );
+                  ] ||
+                  CATEGORY_COLORS.Other;
+
+                const icon =
+                  CATEGORY_ICONS[
+                    item.category
+                  ] ||
+                  CATEGORY_ICONS.Other;
 
                 return (
                   <View
                     key={
                       item.category
                     }
-                    style={
-                      styles.breakdownItem
-                    }
+                    style={[
+                      styles.breakdownRow,
+                      index !==
+                        categoryBreakdown.length -
+                          1 &&
+                        styles.rowDivider,
+                    ]}
                   >
                     <View
+                      style={[
+                        styles.categoryIcon,
+                        {
+                          backgroundColor:
+                            `${color}15`,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          icon
+                        }
+                        size={
+                          18
+                        }
+                        color={
+                          color
+                        }
+                      />
+                    </View>
+
+                    <View
                       style={
-                        styles.breakdownTop
+                        styles.breakdownMain
                       }
                     >
                       <View
                         style={
-                          styles.categoryLeft
+                          styles.breakdownTop
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.breakdownName
+                          }
+                        >
+                          {
+                            item.category
+                          }
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.breakdownAmount
+                          }
+                        >
+                          {formatAmount(
+                            item.amount
+                          )}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.progressTrack
                         }
                       >
                         <View
                           style={[
-                            styles.categoryIcon,
+                            styles.progressFill,
                             {
+                              width: `${Math.min(
+                                item.percentage,
+                                100
+                              )}%`,
                               backgroundColor:
-                                `${color}18`,
+                                color,
                             },
                           ]}
-                        >
-                          <Ionicons
-                            name={getCategoryIcon(
-                              item.category
-                            )}
-                            size={
-                              18
-                            }
-                            color={
-                              color
-                            }
-                          />
-                        </View>
-
-                        <View
-                          style={
-                            styles.categoryInfo
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.categoryName
-                            }
-                          >
-                            {
-                              item.category
-                            }
-                          </Text>
-
-                          <Text
-                            style={
-                              styles.categoryPercentage
-                            }
-                          >
-                            {item.percentage.toFixed(
-                              1
-                            )}
-                            %
-                          </Text>
-                        </View>
+                        />
                       </View>
 
                       <Text
                         style={
-                          styles.categoryAmount
+                          styles.breakdownPercentage
                         }
                       >
-                        {formatAmount(
-                          item.amount
+                        {Math.round(
+                          item.percentage
                         )}
+                        % of total
                       </Text>
-                    </View>
-
-                    <View
-                      style={
-                        styles.progressTrack
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${Math.min(
-                              item.percentage,
-                              100
-                            )}%`,
-                            backgroundColor:
-                              color,
-                          },
-                        ]}
-                      />
                     </View>
                   </View>
                 );
               }
-            )
-          )}
-        </View>
-
-        {/* ========================= */}
-        {/* TRANSACTIONS */}
-        {/* ========================= */}
-
-        <View
-          style={
-            styles.glassCard
-          }
-        >
-          <View
-            style={
-              styles.cardHeader
-            }
-          >
-            <View>
-              <Text
-                style={
-                  styles.cardTitle
-                }
-              >
-                Transactions
-              </Text>
-
-              <Text
-                style={
-                  styles.cardSubtitle
-                }
-              >
-                {
-                  transactionCount
-                }{" "}
-                recorded
-              </Text>
-            </View>
-
-            <Ionicons
-              name="receipt-outline"
-              size={21}
-              color={BLUE}
-            />
+            )}
           </View>
+        )}
 
-          {filteredExpenses.length ===
-          0 ? (
-            <View
-              style={
-                styles.emptyBreakdown
-              }
-            >
-              <Text
-                style={
-                  styles.emptyTitle
-                }
-              >
-                Nothing here
-              </Text>
-
-              <Text
-                style={
-                  styles.emptyText
-                }
-              >
-                Try changing your
-                filters.
-              </Text>
-            </View>
-          ) : (
-            filteredExpenses
-              .slice(
-                0,
-                30
-              )
-              .map(
-                (
-                  expense
-                ) => {
-                  const color =
-                    getCategoryColor(
-                      expense.category
-                    );
-
-                  return (
-                    <TouchableOpacity
-                      key={
-                        expense.id
-                      }
-                      style={
-                        styles.transaction
-                      }
-                      activeOpacity={
-                        0.75
-                      }
-                      onPress={() =>
-                        router.push({
-                          pathname:
-                            "/edit-expense",
-                          params:
-                            {
-                              id: String(
-                                expense.id
-                              ),
-                            },
-                        })
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.transactionIcon,
-                          {
-                            backgroundColor:
-                              `${color}18`,
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name={getCategoryIcon(
-                            expense.category
-                          )}
-                          size={
-                            19
-                          }
-                          color={
-                            color
-                          }
-                        />
-                      </View>
-
-                      <View
-                        style={
-                          styles.transactionInfo
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.transactionCategory
-                          }
-                        >
-                          {
-                            expense.category
-                          }
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.transactionNote
-                          }
-                          numberOfLines={
-                            1
-                          }
-                        >
-                          {expense.note ||
-                            "Expense"}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={
-                          styles.transactionRight
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.transactionAmount
-                          }
-                        >
-                          -{" "}
-                          {formatAmount(
-                            expense.amount
-                          )}
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.transactionDate
-                          }
-                        >
-                          {formatDate(
-                            expense.date
-                          )}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }
-              )
-          )}
-
-          {filteredExpenses.length >
-            30 && (
-            <Text
-              style={
-                styles.moreText
-              }
-            >
-              Showing the first 30
-              transactions
-            </Text>
-          )}
-        </View>
-
-        {/* ========================= */}
         {/* EXPORT */}
-        {/* ========================= */}
-
         <View
           style={
             styles.exportCard
@@ -1517,15 +1233,17 @@ export default function ReportsScreen() {
             }
           >
             <Ionicons
-              name="download-outline"
+              name="share-outline"
               size={24}
-              color={GOLD}
+              color={
+                BLUE
+              }
             />
           </View>
 
           <View
             style={
-              styles.exportInfo
+              styles.exportContent
             }
           >
             <Text
@@ -1533,17 +1251,17 @@ export default function ReportsScreen() {
                 styles.exportTitle
               }
             >
-              Export your report
+              Export Report
             </Text>
 
             <Text
               style={
-                styles.exportDescription
+                styles.exportText
               }
             >
-              Share your filtered
-              spending data as
-              a CSV file.
+              Create a CSV report using the
+              current filters and share it
+              anywhere.
             </Text>
           </View>
 
@@ -1554,65 +1272,276 @@ export default function ReportsScreen() {
             onPress={
               handleExport
             }
-            disabled={
-              exporting
-            }
             activeOpacity={
               0.85
             }
           >
-            {exporting ? (
-              <ActivityIndicator
-                size="small"
-                color={
-                  WHITE
-                }
-              />
-            ) : (
-              <Ionicons
-                name="share-outline"
-                size={20}
-                color={
-                  WHITE
-                }
-              />
-            )}
+            <Ionicons
+              name="download-outline"
+              size={18}
+              color={
+                WHITE
+              }
+            />
+
+            <Text
+              style={
+                styles.exportButtonText
+              }
+            >
+              Export
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ========================= */}
-        {/* FOOTER */}
-        {/* ========================= */}
+        {/* TRANSACTIONS */}
+        <View
+          style={
+            styles.sectionHeader
+          }
+        >
+          <View>
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Transactions
+            </Text>
 
+            <Text
+              style={
+                styles.sectionSubtitle
+              }
+            >
+              {periodExpenses.length >
+              30
+                ? "Showing latest 30 transactions"
+                : `${periodExpenses.length} transaction${
+                    periodExpenses.length ===
+                    1
+                      ? ""
+                      : "s"
+                  }`}
+            </Text>
+          </View>
+        </View>
+
+        {latestTransactions.length ===
+        0 ? (
+          <View
+            style={
+              styles.emptyCard
+            }
+          >
+            <View
+              style={
+                styles.emptyIcon
+              }
+            >
+              <Ionicons
+                name="receipt-outline"
+                size={25}
+                color={
+                  BLUE
+                }
+              />
+            </View>
+
+            <Text
+              style={
+                styles.emptyTitle
+              }
+            >
+              No transactions
+            </Text>
+
+            <Text
+              style={
+                styles.emptyText
+              }
+            >
+              No expenses match your
+              current report filters.
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={
+              styles.transactionsCard
+            }
+          >
+            {latestTransactions.map(
+              (
+                expense,
+                index
+              ) => {
+                const color =
+                  CATEGORY_COLORS[
+                    expense.category
+                  ] ||
+                  CATEGORY_COLORS.Other;
+
+                const icon =
+                  CATEGORY_ICONS[
+                    expense.category
+                  ] ||
+                  CATEGORY_ICONS.Other;
+
+                return (
+                  <TouchableOpacity
+                    key={
+                      expense.id
+                    }
+                    style={[
+                      styles.transactionRow,
+                      index !==
+                        latestTransactions.length -
+                          1 &&
+                        styles.rowDivider,
+                    ]}
+                    onPress={() =>
+                      handleTransactionPress(
+                        expense.id
+                      )
+                    }
+                    activeOpacity={
+                      0.75
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.transactionIcon,
+                        {
+                          backgroundColor:
+                            `${color}15`,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          icon
+                        }
+                        size={
+                          18
+                        }
+                        color={
+                          color
+                        }
+                      />
+                    </View>
+
+                    <View
+                      style={
+                        styles.transactionMain
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.transactionCategory
+                        }
+                      >
+                        {
+                          expense.category
+                        }
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.transactionNote
+                        }
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {expense.note ||
+                          "No note"}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.transactionDate
+                        }
+                      >
+                        {formatDate(
+                          expense.date
+                        )}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.transactionRight
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.transactionAmount
+                        }
+                      >
+                        {formatAmount(
+                          expense.amount
+                        )}
+                      </Text>
+
+                      <Ionicons
+                        name="chevron-forward"
+                        size={15}
+                        color={
+                          MUTED
+                        }
+                      />
+                    </View>
+                  </TouchableOpacity>
+                );
+              }
+            )}
+          </View>
+        )}
+
+        {/* FOOTER */}
         <View
           style={
             styles.footer
           }
         >
-          <Text
+          <View
             style={
-              styles.footerBrand
+              styles.footerIcon
             }
           >
-            Spendly
+            <Ionicons
+              name="diamond"
+              size={18}
+              color={
+                GOLD
+              }
+            />
+          </View>
+
+          <Text
+            style={
+              styles.footerTitle
+            }
+          >
+            Spendly Pro
           </Text>
 
           <Text
             style={
-              styles.footerTagline
+              styles.footerText
             }
           >
-            Smart Spending,
-            Brighter Tomorrows
+            Your spending. Your data. Your
+            decisions.
           </Text>
 
           <Text
             style={
-              styles.footerNote
+              styles.tagline
             }
           >
-            Your financial data
-            stays on your device.
+            Smart Spending, Brighter Tomorrows
           </Text>
         </View>
       </ScrollView>
@@ -1620,605 +1549,795 @@ export default function ReportsScreen() {
   );
 }
 
-const styles =
-  StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: BG,
-    },
-
-    content: {
-      padding: 20,
-      paddingBottom: 50,
-    },
-
-    backgroundOrbOne: {
-      position:
-        "absolute",
-      width: 260,
-      height: 260,
-      borderRadius: 130,
-      backgroundColor:
-        "rgba(37,99,235,0.07)",
-      top: -100,
-      right: -110,
-    },
-
-    backgroundOrbTwo: {
-      position:
-        "absolute",
-      width: 220,
-      height: 220,
-      borderRadius: 110,
-      backgroundColor:
-        "rgba(184,138,36,0.06)",
-      bottom: 100,
-      left: -130,
-    },
-
-    loadingContainer: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: BG,
-    },
-
-    loadingIcon: {
-      width: 62,
-      height: 62,
-      borderRadius: 22,
-      backgroundColor:
-        "rgba(37,99,235,0.08)",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 15,
-    },
-
-    loadingText: {
-      marginTop: 12,
-      fontSize: 12,
-      color: MUTED,
-      fontWeight: "600",
-    },
-
-    header: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      marginBottom: 24,
-    },
-
-    backButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 15,
-      backgroundColor:
-        "rgba(255,255,255,0.78)",
-      borderWidth: 1,
-      borderColor:
-        BORDER,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      shadowColor:
-        "#0F172A",
-      shadowOpacity:
-        0.04,
-      shadowRadius:
-        12,
-      shadowOffset: {
-        width: 0,
-        height: 5,
-      },
-      elevation: 2,
-    },
-
-    headerCenter: {
-      flex: 1,
-      marginLeft: 14,
-    },
-
-    eyebrow: {
-      fontSize: 10,
-      fontWeight: "800",
-      letterSpacing: 1.5,
-      color: BLUE,
-      marginBottom: 2,
-    },
-
-    title: {
-      fontSize: 26,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    subtitle: {
-      fontSize: 12,
-      color: MUTED,
-      marginTop: 2,
-    },
-
-    headerBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 15,
-      backgroundColor:
-        "rgba(255,255,255,0.78)",
-      borderWidth: 1,
-      borderColor:
-        BORDER,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    summaryCard: {
-      backgroundColor:
-        "rgba(255,255,255,0.82)",
-      borderRadius: 28,
-      borderWidth: 1,
-      borderColor:
-        "rgba(37,99,235,0.12)",
-      padding: 22,
-      marginBottom: 24,
-      shadowColor:
-        "#0F172A",
-      shadowOpacity:
-        0.06,
-      shadowRadius:
-        20,
-      shadowOffset: {
-        width: 0,
-        height: 10,
-      },
-      elevation: 3,
-    },
-
-    summaryTop: {
-      flexDirection:
-        "row",
-      justifyContent:
-        "space-between",
-      alignItems:
-        "flex-start",
-    },
-
-    summaryLabel: {
-      fontSize: 10,
-      fontWeight: "800",
-      letterSpacing: 1.3,
-      color: MUTED,
-      marginBottom: 8,
-    },
-
-    totalAmount: {
-      fontSize: 29,
-      fontWeight: "900",
-      color: TEXT,
-    },
-
-    summaryIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 17,
-      backgroundColor:
-        "#EAF1FF",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    summaryDivider: {
-      height: 1,
-      backgroundColor:
-        "rgba(148,163,184,0.16)",
-      marginVertical: 20,
-    },
-
-    summaryStats: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-    },
-
-    statItem: {
-      flex: 1,
-      alignItems:
-        "center",
-      minWidth: 0,
-    },
-
-    statValue: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: TEXT,
-      textAlign: "center",
-      maxWidth: "100%",
-    },
-
-    statLabel: {
-      fontSize: 9,
-      color: MUTED,
-      marginTop: 5,
-      textAlign: "center",
-    },
-
-    statDivider: {
-      width: 1,
-      height: 30,
-      backgroundColor:
-        "rgba(148,163,184,0.18)",
-    },
-
-    section: {
-      marginBottom: 20,
-    },
-
-    sectionTitle: {
-      fontSize: 14,
-      fontWeight: "800",
-      color: TEXT,
-      marginBottom: 11,
-    },
-
-    filterRow: {
-      gap: 9,
-    },
-
-    filterChip: {
-      paddingHorizontal: 15,
-      paddingVertical: 10,
-      borderRadius: 15,
-      backgroundColor:
-        "rgba(255,255,255,0.76)",
-      borderWidth: 1,
-      borderColor:
-        BORDER,
-    },
-
-    filterChipActive: {
-      backgroundColor: BLUE,
-      borderColor: BLUE,
-    },
-
-    filterText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: MUTED,
-    },
-
-    filterTextActive: {
-      color: WHITE,
-    },
-
-    categoryChip: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 15,
-      backgroundColor:
-        "rgba(255,255,255,0.76)",
-      borderWidth: 1,
-      borderColor:
-        BORDER,
-    },
-
-    categoryChipActive: {
-      backgroundColor: BLUE,
-      borderColor: BLUE,
-    },
-
-    categoryChipText: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: MUTED,
-    },
-
-    categoryChipTextActive: {
-      color: WHITE,
-    },
-
-    glassCard: {
-      backgroundColor:
-        "rgba(255,255,255,0.78)",
-      borderRadius: 25,
-      borderWidth: 1,
-      borderColor:
-        BORDER,
-      padding: 19,
-      marginBottom: 20,
-      shadowColor:
-        "#0F172A",
-      shadowOpacity: 0.04,
-      shadowRadius: 18,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      elevation: 2,
-    },
-
-    cardHeader: {
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-start",
-      justifyContent:
-        "space-between",
-      marginBottom: 18,
-    },
-
-    cardTitle: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    cardSubtitle: {
-      fontSize: 11,
-      color: MUTED,
-      marginTop: 4,
-    },
-
-    breakdownItem: {
-      marginBottom: 18,
-    },
-
-    breakdownTop: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      justifyContent:
-        "space-between",
-      marginBottom: 9,
-    },
-
-    categoryLeft: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      flex: 1,
-      minWidth: 0,
-    },
-
-    categoryIcon: {
-      width: 38,
-      height: 38,
-      borderRadius: 13,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      marginRight: 10,
-    },
-
-    categoryInfo: {
-      flex: 1,
-      minWidth: 0,
-    },
-
-    categoryName: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    categoryPercentage: {
-      fontSize: 10,
-      color: MUTED,
-      marginTop: 2,
-    },
-
-    categoryAmount: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: TEXT,
-      marginLeft: 10,
-    },
-
-    progressTrack: {
-      height: 7,
-      borderRadius: 10,
-      backgroundColor:
-        "#E9EEF5",
-      overflow: "hidden",
-    },
-
-    progressFill: {
-      height: "100%",
-      borderRadius: 10,
-    },
-
-    transaction: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor:
-        "rgba(148,163,184,0.12)",
-    },
-
-    transactionIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 14,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      marginRight: 11,
-    },
-
-    transactionInfo: {
-      flex: 1,
-      minWidth: 0,
-    },
-
-    transactionCategory: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    transactionNote: {
-      fontSize: 10,
-      color: MUTED,
-      marginTop: 4,
-    },
-
-    transactionRight: {
-      alignItems:
-        "flex-end",
-      marginLeft: 8,
-    },
-
-    transactionAmount: {
-      fontSize: 12,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    transactionDate: {
-      fontSize: 9,
-      color: MUTED,
-      marginTop: 4,
-    },
-
-    moreText: {
-      textAlign: "center",
-      fontSize: 10,
-      color: MUTED,
-      marginTop: 14,
-    },
-
-    emptyBreakdown: {
-      alignItems: "center",
-      paddingVertical: 22,
-    },
-
-    emptyIcon: {
-      width: 54,
-      height: 54,
-      borderRadius: 19,
-      backgroundColor:
-        "#EEF2F7",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      marginBottom: 10,
-    },
-
-    emptyTitle: {
-      fontSize: 13,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    emptyText: {
-      fontSize: 11,
-      color: MUTED,
-      marginTop: 5,
-      textAlign: "center",
-    },
-
-    exportCard: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      backgroundColor:
-        "rgba(255,255,255,0.82)",
-      borderRadius: 23,
-      borderWidth: 1,
-      borderColor:
-        "rgba(184,138,36,0.20)",
-      padding: 17,
-      marginBottom: 28,
-    },
-
-    exportIcon: {
-      width: 45,
-      height: 45,
-      borderRadius: 15,
-      backgroundColor:
-        "rgba(184,138,36,0.10)",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    exportInfo: {
-      flex: 1,
-      marginLeft: 12,
-      marginRight: 10,
-    },
-
-    exportTitle: {
-      fontSize: 13,
-      fontWeight: "800",
-      color: TEXT,
-    },
-
-    exportDescription: {
-      fontSize: 10,
-      lineHeight: 15,
-      color: MUTED,
-      marginTop: 4,
-    },
-
-    exportButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 15,
-      backgroundColor: BLUE,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      shadowColor: BLUE,
-      shadowOpacity: 0.22,
-      shadowRadius: 12,
-      elevation: 3,
-    },
-
-    footer: {
-      alignItems: "center",
-      paddingTop: 4,
-      paddingBottom: 25,
-    },
-
-    footerBrand: {
-      fontSize: 14,
-      fontWeight: "900",
-      color: BLUE,
-      letterSpacing: 0.5,
-    },
-
-    footerTagline: {
-      fontSize: 10,
-      fontWeight: "600",
-      color: MUTED,
-      marginTop: 3,
-    },
-
-    footerNote: {
-      fontSize: 9,
-      color: "#94A3B8",
-      marginTop: 8,
-    },
-  });
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor:
+      BG,
+  },
+
+  orbTop: {
+    position:
+      "absolute",
+    width: 230,
+    height: 230,
+    borderRadius:
+      115,
+    backgroundColor:
+      "#DCEBFF",
+    opacity: 0.5,
+    top: -100,
+    right: -110,
+  },
+
+  orbBottom: {
+    position:
+      "absolute",
+    width: 190,
+    height: 190,
+    borderRadius:
+      95,
+    backgroundColor:
+      "#F5E8C8",
+    opacity: 0.32,
+    bottom: 50,
+    left: -120,
+  },
+
+  container: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 60,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    gap: 14,
+  },
+
+  loadingIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor:
+      "#EAF2FF",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  loadingText: {
+    color: MUTED,
+    fontSize: 14,
+    fontWeight:
+      "600",
+  },
+
+  header: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    marginBottom:
+      18,
+  },
+
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    backgroundColor:
+      "rgba(255,255,255,0.78)",
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  headerCenter: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  headerTitle: {
+    color: TEXT,
+    fontSize: 20,
+    fontWeight:
+      "800",
+    letterSpacing:
+      -0.4,
+  },
+
+  headerSubtitle: {
+    color: MUTED,
+    fontSize: 12,
+    marginTop: 3,
+    fontWeight:
+      "500",
+  },
+
+  proBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 13,
+    backgroundColor:
+      "rgba(184,138,36,0.12)",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    borderWidth: 1,
+    borderColor:
+      "rgba(184,138,36,0.22)",
+  },
+
+  heroCard: {
+    minHeight: 190,
+    borderRadius: 28,
+    padding: 22,
+    marginBottom:
+      24,
+    overflow:
+      "hidden",
+    backgroundColor:
+      BLUE,
+    borderWidth: 1,
+    borderColor:
+      "rgba(255,255,255,0.35)",
+  },
+
+  heroGlowOne: {
+    position:
+      "absolute",
+    width: 190,
+    height: 190,
+    borderRadius:
+      95,
+    backgroundColor:
+      "rgba(255,255,255,0.08)",
+    right: -80,
+    top: -90,
+  },
+
+  heroGlowTwo: {
+    position:
+      "absolute",
+    width: 130,
+    height: 130,
+    borderRadius:
+      65,
+    backgroundColor:
+      "rgba(184,138,36,0.20)",
+    left: -60,
+    bottom: -60,
+  },
+
+  heroTop: {
+    flexDirection:
+      "row",
+    alignItems:
+      "flex-start",
+    justifyContent:
+      "space-between",
+  },
+
+  heroContent: {
+    flex: 1,
+  },
+
+  eyebrow: {
+    color:
+      "rgba(255,255,255,0.72)",
+    fontSize: 10,
+    fontWeight:
+      "900",
+    letterSpacing:
+      1.8,
+    marginBottom:
+      7,
+  },
+
+  heroTitle: {
+    color: WHITE,
+    fontSize: 27,
+    fontWeight:
+      "900",
+    letterSpacing:
+      -0.8,
+  },
+
+  heroDescription: {
+    color:
+      "rgba(255,255,255,0.82)",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+    maxWidth: 270,
+  },
+
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    backgroundColor:
+      "rgba(255,255,255,0.12)",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    borderWidth: 1,
+    borderColor:
+      "rgba(255,255,255,0.18)",
+  },
+
+  sectionHeader: {
+    flexDirection:
+      "row",
+    alignItems:
+      "flex-end",
+    justifyContent:
+      "space-between",
+    marginBottom:
+      11,
+    marginTop: 2,
+  },
+
+  sectionHeaderSmall: {
+    marginTop: 1,
+    marginBottom: 8,
+  },
+
+  sectionTitle: {
+    color: TEXT,
+    fontSize: 18,
+    fontWeight:
+      "800",
+    letterSpacing:
+      -0.3,
+  },
+
+  sectionSubtitle: {
+    color: MUTED,
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  periodScroll: {
+    paddingBottom: 18,
+    paddingRight: 10,
+  },
+
+  periodChip: {
+    paddingHorizontal: 16,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor:
+      "rgba(255,255,255,0.76)",
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    marginRight: 8,
+  },
+
+  periodChipActive: {
+    backgroundColor:
+      BLUE,
+    borderColor:
+      BLUE,
+  },
+
+  periodChipText: {
+    color: MUTED,
+    fontSize: 11,
+    fontWeight:
+      "800",
+  },
+
+  periodChipTextActive: {
+    color: WHITE,
+  },
+
+  categoryChip: {
+    paddingHorizontal: 15,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor:
+      "rgba(255,255,255,0.76)",
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    marginRight: 8,
+  },
+
+  categoryChipActive: {
+    backgroundColor:
+      "#EAF2FF",
+    borderColor:
+      "#BBD3FF",
+  },
+
+  categoryChipText: {
+    color: MUTED,
+    fontSize: 10,
+    fontWeight:
+      "800",
+  },
+
+  categoryChipTextActive: {
+    color: BLUE,
+  },
+
+  summaryCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.82)",
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    padding: 20,
+    marginBottom:
+      12,
+  },
+
+  summaryLabel: {
+    color: MUTED,
+    fontSize: 9,
+    fontWeight:
+      "900",
+    letterSpacing:
+      1.2,
+  },
+
+  summaryAmount: {
+    color: TEXT,
+    fontSize: 31,
+    fontWeight:
+      "900",
+    letterSpacing:
+      -0.8,
+    marginTop: 4,
+  },
+
+  summaryStats: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    marginTop: 18,
+  },
+
+  summaryStat: {
+    flex: 1,
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+  },
+
+  summaryStatIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor:
+      "#EAF2FF",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    marginRight: 9,
+  },
+
+  summaryStatLabel: {
+    color: MUTED,
+    fontSize: 9,
+    fontWeight:
+      "700",
+  },
+
+  summaryStatValue: {
+    color: TEXT,
+    fontSize: 13,
+    fontWeight:
+      "900",
+    marginTop: 2,
+  },
+
+  summaryDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor:
+      "rgba(148,163,184,0.16)",
+    marginHorizontal: 10,
+  },
+
+  topCategoryCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.78)",
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor:
+      "rgba(184,138,36,0.22)",
+    padding: 17,
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    marginBottom:
+      23,
+  },
+
+  topCategoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor:
+      "rgba(184,138,36,0.12)",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  topCategoryContent: {
+    marginLeft: 13,
+    flex: 1,
+  },
+
+  topCategoryLabel: {
+    color: GOLD,
+    fontSize: 8,
+    fontWeight:
+      "900",
+    letterSpacing:
+      1.1,
+  },
+
+  topCategoryName: {
+    color: TEXT,
+    fontSize: 16,
+    fontWeight:
+      "900",
+    marginTop: 3,
+  },
+
+  topCategoryAmount: {
+    color: MUTED,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  glassCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.78)",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    paddingHorizontal: 17,
+    marginBottom:
+      23,
+  },
+
+  breakdownRow: {
+    flexDirection:
+      "row",
+    paddingVertical:
+      17,
+  },
+
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor:
+      "rgba(148,163,184,0.12)",
+  },
+
+  categoryIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 15,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  breakdownMain: {
+    flex: 1,
+    marginLeft: 13,
+  },
+
+  breakdownTop: {
+    flexDirection:
+      "row",
+    justifyContent:
+      "space-between",
+    alignItems:
+      "center",
+  },
+
+  breakdownName: {
+    color: TEXT,
+    fontSize: 13,
+    fontWeight:
+      "800",
+  },
+
+  breakdownAmount: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight:
+      "900",
+  },
+
+  progressTrack: {
+    height: 7,
+    backgroundColor:
+      "#E8EDF5",
+    borderRadius: 10,
+    overflow:
+      "hidden",
+    marginTop: 9,
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 10,
+  },
+
+  breakdownPercentage: {
+    color: MUTED,
+    fontSize: 9,
+    marginTop: 4,
+    fontWeight:
+      "600",
+  },
+
+  exportCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.82)",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    padding: 17,
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    marginBottom:
+      23,
+  },
+
+  exportIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor:
+      "#EAF2FF",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  exportContent: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 10,
+  },
+
+  exportTitle: {
+    color: TEXT,
+    fontSize: 14,
+    fontWeight:
+      "900",
+  },
+
+  exportText: {
+    color: MUTED,
+    fontSize: 9.5,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+
+  exportButton: {
+    backgroundColor:
+      BLUE,
+    minHeight: 40,
+    paddingHorizontal: 13,
+    borderRadius: 13,
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  exportButtonText: {
+    color: WHITE,
+    fontSize: 10,
+    fontWeight:
+      "900",
+    marginLeft: 5,
+  },
+
+  transactionsCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.78)",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    paddingHorizontal: 17,
+    marginBottom:
+      23,
+  },
+
+  transactionRow: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    paddingVertical:
+      16,
+  },
+
+  transactionIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 15,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  transactionMain: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+
+  transactionCategory: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight:
+      "900",
+  },
+
+  transactionNote: {
+    color: MUTED,
+    fontSize: 9.5,
+    marginTop: 2,
+  },
+
+  transactionDate: {
+    color: MUTED,
+    fontSize: 8.5,
+    marginTop: 3,
+  },
+
+  transactionRight: {
+    alignItems:
+      "flex-end",
+    flexDirection:
+      "row",
+    gap: 5,
+  },
+
+  transactionAmount: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight:
+      "900",
+  },
+
+  emptyCard: {
+    backgroundColor:
+      "rgba(255,255,255,0.75)",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor:
+      BORDER,
+    padding: 25,
+    alignItems:
+      "center",
+    marginBottom:
+      23,
+  },
+
+  emptyIcon: {
+    width: 53,
+    height: 53,
+    borderRadius: 18,
+    backgroundColor:
+      "#EAF2FF",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    marginBottom:
+      12,
+  },
+
+  emptyTitle: {
+    color: TEXT,
+    fontSize: 15,
+    fontWeight:
+      "800",
+    textAlign:
+      "center",
+  },
+
+  emptyText: {
+    color: MUTED,
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign:
+      "center",
+    marginTop: 5,
+    maxWidth: 290,
+  },
+
+  footer: {
+    alignItems:
+      "center",
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+
+  footerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor:
+      "rgba(184,138,36,0.12)",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    marginBottom: 9,
+  },
+
+  footerTitle: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight:
+      "900",
+  },
+
+  footerText: {
+    color: MUTED,
+    fontSize: 10,
+    textAlign:
+      "center",
+    marginTop: 4,
+  },
+
+  tagline: {
+    color: GOLD,
+    fontSize: 10,
+    fontWeight:
+      "800",
+    marginTop: 10,
+    letterSpacing:
+      0.2,
+  },
+});

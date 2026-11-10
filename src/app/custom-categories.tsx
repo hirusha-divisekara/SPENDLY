@@ -1,63 +1,49 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
     Alert,
-    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
-    SafeAreaView,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from "react-native";
-
 import {
     addCustomCategory,
-    CustomCategory,
     deleteCustomCategory,
     getCustomCategories,
     updateCustomCategory,
 } from "../db/database";
+import { requirePro } from "../services/proGuard";
 
-const BLUE = "#2563EB";
-const GOLD = "#B88A24";
-const BG = "#F5F8FC";
-const TEXT = "#0F172A";
-const MUTED = "#64748B";
-const WHITE = "#FFFFFF";
-const RED = "#DC2626";
+type CustomCategory = {
+  id: number;
+  name: string;
+  icon: string;
+};
 
-const ICONS = [
+const CATEGORY_ICONS = [
+  "wallet-outline",
   "restaurant-outline",
-  "fast-food-outline",
-  "cart-outline",
   "car-outline",
-  "bus-outline",
   "home-outline",
+  "cart-outline",
   "medical-outline",
   "school-outline",
-  "book-outline",
   "game-controller-outline",
-  "film-outline",
-  "musical-notes-outline",
-  "shirt-outline",
-  "phone-portrait-outline",
-  "wifi-outline",
-  "flash-outline",
-  "water-outline",
-  "airplane-outline",
   "gift-outline",
-  "heart-outline",
+  "airplane-outline",
   "fitness-outline",
   "briefcase-outline",
-  "wallet-outline",
-  "cash-outline",
-  "card-outline",
+  "phone-portrait-outline",
+  "shirt-outline",
+  "cafe-outline",
+  "paw-outline",
 ];
 
 export default function CustomCategoriesScreen() {
@@ -69,12 +55,14 @@ export default function CustomCategoriesScreen() {
     useState<CustomCategory | null>(null);
 
   const [name, setName] = useState("");
-  const [selectedIcon, setSelectedIcon] =
-    useState("wallet-outline");
-
+  const [selectedIcon, setSelectedIcon] = useState("wallet-outline");
   const [saving, setSaving] = useState(false);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
+    if (!(await requirePro())) {
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -82,36 +70,28 @@ export default function CustomCategoriesScreen() {
 
       setCategories(data);
     } catch (error) {
-      console.error(
-        "❌ FAILED TO LOAD CUSTOM CATEGORIES:",
-        error
-      );
-
+      console.error("Failed to load custom categories:", error);
       Alert.alert(
-        "Something went wrong",
+        "Error",
         "Unable to load your custom categories."
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadCategories();
-    }, [])
-  );
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
-  const openCreateModal = () => {
+  const openAddModal = () => {
     setEditingCategory(null);
     setName("");
     setSelectedIcon("wallet-outline");
     setModalVisible(true);
   };
 
-  const openEditModal = (
-    category: CustomCategory
-  ) => {
+  const openEditModal = (category: CustomCategory) => {
     setEditingCategory(category);
     setName(category.name);
     setSelectedIcon(category.icon);
@@ -119,7 +99,9 @@ export default function CustomCategoriesScreen() {
   };
 
   const closeModal = () => {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
 
     setModalVisible(false);
     setEditingCategory(null);
@@ -127,22 +109,11 @@ export default function CustomCategoriesScreen() {
     setSelectedIcon("wallet-outline");
   };
 
-  const handleSave = async () => {
+  const saveCategory = async () => {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      Alert.alert(
-        "Category name required",
-        "Please enter a name for your category."
-      );
-      return;
-    }
-
-    if (trimmedName.length > 30) {
-      Alert.alert(
-        "Name too long",
-        "Category names can contain up to 30 characters."
-      );
+      Alert.alert("Missing Name", "Please enter a category name.");
       return;
     }
 
@@ -162,42 +133,27 @@ export default function CustomCategoriesScreen() {
         );
       }
 
-      closeModal();
+      setModalVisible(false);
+      setEditingCategory(null);
+      setName("");
+      setSelectedIcon("wallet-outline");
+
       await loadCategories();
-    } catch (error: any) {
-      console.error(
-        "❌ FAILED TO SAVE CATEGORY:",
-        error
+    } catch (error) {
+      console.error("Failed to save category:", error);
+
+      Alert.alert(
+        "Error",
+        "Unable to save this category. Please try again."
       );
-
-      const message = String(
-        error?.message ?? ""
-      ).toLowerCase();
-
-      if (
-        message.includes("unique") ||
-        message.includes("constraint")
-      ) {
-        Alert.alert(
-          "Category already exists",
-          "Please choose a different category name."
-        );
-      } else {
-        Alert.alert(
-          "Could not save category",
-          "Something went wrong while saving your category."
-        );
-      }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (
-    category: CustomCategory
-  ) => {
+  const handleDelete = (category: CustomCategory) => {
     Alert.alert(
-      "Delete category?",
+      "Delete Category",
       `Are you sure you want to delete "${category.name}"?`,
       [
         {
@@ -209,19 +165,16 @@ export default function CustomCategoriesScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteCustomCategory(
-                category.id
-              );
-
+              await deleteCustomCategory(category.id);
               await loadCategories();
             } catch (error) {
               console.error(
-                "❌ FAILED TO DELETE CATEGORY:",
+                "Failed to delete category:",
                 error
               );
 
               Alert.alert(
-                "Delete failed",
+                "Error",
                 "Unable to delete this category."
               );
             }
@@ -231,155 +184,139 @@ export default function CustomCategoriesScreen() {
     );
   };
 
+  const renderIcon = (iconName: string, size = 24) => {
+    return (
+      <Ionicons
+        name={iconName as any}
+        size={size}
+        color="#2563EB"
+      />
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.backgroundOrbTop} />
-      <View style={styles.backgroundOrbBottom} />
+    <View style={styles.container}>
+      <View style={styles.backgroundOrbOne} />
+      <View style={styles.backgroundOrbTwo} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
-
         <View style={styles.header}>
-          <TouchableOpacity
+          <Pressable
             style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
+            onPress={() => router.replace("/pro")}
           >
             <Ionicons
               name="arrow-back"
               size={22}
-              color={TEXT}
+              color="#0F172A"
             />
-          </TouchableOpacity>
+          </Pressable>
 
           <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>
+            <Text style={styles.eyebrow}>SPENDLY PRO</Text>
+
+            <Text style={styles.title}>
               Custom Categories
             </Text>
 
-            <Text style={styles.headerSubtitle}>
-              Organize spending your way
+            <Text style={styles.subtitle}>
+              Create categories that fit the way you spend.
             </Text>
-          </View>
-
-          <View style={styles.proBadge}>
-            <Ionicons
-              name="diamond"
-              size={15}
-              color={GOLD}
-            />
           </View>
         </View>
 
         {/* Hero */}
-
         <View style={styles.heroCard}>
-          <View style={styles.heroOrb} />
-
           <View style={styles.heroIcon}>
             <Ionicons
-              name="pricetags-outline"
-              size={25}
-              color={BLUE}
+              name="apps-outline"
+              size={28}
+              color="#2563EB"
             />
           </View>
 
-          <Text style={styles.heroTitle}>
-            Make Spendly{" "}
-            <Text style={styles.heroAccent}>
-              yours.
+          <View style={styles.heroText}>
+            <Text style={styles.heroTitle}>
+              Make Spendly yours
             </Text>
-          </Text>
 
-          <Text style={styles.heroDescription}>
-            Create categories that match the way
-            you actually spend your money.
-          </Text>
-
-          <View style={styles.heroStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {categories.length}
-              </Text>
-
-              <Text style={styles.statLabel}>
-                Custom categories
-              </Text>
-            </View>
-
-            <View style={styles.statDivider} />
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                ∞
-              </Text>
-
-              <Text style={styles.statLabel}>
-                Your way
-              </Text>
-            </View>
+            <Text style={styles.heroDescription}>
+              Add your own categories and organize expenses
+              exactly how you want.
+            </Text>
           </View>
         </View>
 
         {/* Add Button */}
-
-        <TouchableOpacity
+        <Pressable
           style={styles.addButton}
-          onPress={openCreateModal}
-          activeOpacity={0.85}
+          onPress={openAddModal}
         >
-          <View style={styles.addIcon}>
+          <View style={styles.addButtonIcon}>
             <Ionicons
               name="add"
-              size={23}
-              color={WHITE}
+              size={22}
+              color="#FFFFFF"
             />
           </View>
 
-          <View style={styles.addTextContainer}>
-            <Text style={styles.addTitle}>
-              Create category
+          <View style={styles.addButtonText}>
+            <Text style={styles.addButtonTitle}>
+              Add Custom Category
             </Text>
 
-            <Text style={styles.addSubtitle}>
-              Add a category for your spending
+            <Text style={styles.addButtonSubtitle}>
+              Create a category for your spending
             </Text>
           </View>
 
           <Ionicons
             name="chevron-forward"
             size={20}
-            color={BLUE}
+            color="#FFFFFF"
           />
-        </TouchableOpacity>
+        </Pressable>
 
-        {/* Categories */}
-
+        {/* Section */}
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>
-              Your categories
+            <Text style={styles.sectionEyebrow}>
+              YOUR CATEGORIES
             </Text>
 
-            <Text style={styles.sectionSubtitle}>
-              Personalize your spending labels
+            <Text style={styles.sectionTitle}>
+              Custom Categories
+            </Text>
+          </View>
+
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>
+              {categories.length}
             </Text>
           </View>
         </View>
 
+        {/* Loading */}
         {loading ? (
           <View style={styles.emptyCard}>
-            <Ionicons
-              name="sync-outline"
-              size={28}
-              color={BLUE}
-            />
+            <View style={styles.emptyIcon}>
+              <Ionicons
+                name="hourglass-outline"
+                size={28}
+                color="#2563EB"
+              />
+            </View>
 
             <Text style={styles.emptyTitle}>
               Loading categories...
+            </Text>
+
+            <Text style={styles.emptyDescription}>
+              Your custom categories are being loaded.
             </Text>
           </View>
         ) : categories.length === 0 ? (
@@ -387,8 +324,8 @@ export default function CustomCategoriesScreen() {
             <View style={styles.emptyIcon}>
               <Ionicons
                 name="pricetags-outline"
-                size={28}
-                color={BLUE}
+                size={30}
+                color="#2563EB"
               />
             </View>
 
@@ -397,39 +334,34 @@ export default function CustomCategoriesScreen() {
             </Text>
 
             <Text style={styles.emptyDescription}>
-              Create your first category to make
-              Spendly fit your lifestyle.
+              Create your first custom category to make your
+              expense tracking more personal.
             </Text>
 
-            <TouchableOpacity
+            <Pressable
               style={styles.emptyButton}
-              onPress={openCreateModal}
-              activeOpacity={0.85}
+              onPress={openAddModal}
             >
               <Ionicons
                 name="add"
                 size={18}
-                color={WHITE}
+                color="#2563EB"
               />
 
               <Text style={styles.emptyButtonText}>
-                Create category
+                Create Category
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         ) : (
-          <View style={styles.categoriesList}>
+          <View style={styles.categoryList}>
             {categories.map((category) => (
               <View
                 key={category.id}
                 style={styles.categoryCard}
               >
-                <View style={styles.categoryIcon}>
-                  <Ionicons
-                    name={category.icon as any}
-                    size={23}
-                    color={BLUE}
-                  />
+                <View style={styles.categoryIconContainer}>
+                  {renderIcon(category.icon)}
                 </View>
 
                 <View style={styles.categoryInfo}>
@@ -437,108 +369,94 @@ export default function CustomCategoriesScreen() {
                     {category.name}
                   </Text>
 
-                  <Text style={styles.categorySubtitle}>
-                    Custom Spendly category
+                  <Text style={styles.categoryDescription}>
+                    Custom spending category
                   </Text>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() =>
-                    openEditModal(category)
-                  }
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name="create-outline"
-                    size={18}
-                    color={BLUE}
-                  />
-                </TouchableOpacity>
+                <View style={styles.categoryActions}>
+                  <Pressable
+                    style={styles.actionButton}
+                    onPress={() =>
+                      openEditModal(category)
+                    }
+                  >
+                    <Ionicons
+                      name="create-outline"
+                      size={19}
+                      color="#2563EB"
+                    />
+                  </Pressable>
 
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.deleteActionButton,
-                  ]}
-                  onPress={() =>
-                    handleDelete(category)
-                  }
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={18}
-                    color={RED}
-                  />
-                </TouchableOpacity>
+                  <Pressable
+                    style={[
+                      styles.actionButton,
+                      styles.deleteButton,
+                    ]}
+                    onPress={() =>
+                      handleDelete(category)
+                    }
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={19}
+                      color="#DC2626"
+                    />
+                  </Pressable>
+                </View>
               </View>
             ))}
           </View>
         )}
 
-        {/* Pro Insight */}
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightIcon}>
+        {/* Pro info */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoIcon}>
             <Ionicons
               name="sparkles-outline"
-              size={21}
-              color={GOLD}
+              size={22}
+              color="#B88A24"
             />
           </View>
 
-          <View style={styles.insightContent}>
-            <Text style={styles.insightLabel}>
-              SPENDLY PRO
+          <View style={styles.infoText}>
+            <Text style={styles.infoTitle}>
+              Built for your spending style
             </Text>
 
-            <Text style={styles.insightTitle}>
-              Your spending, your system.
-            </Text>
-
-            <Text style={styles.insightDescription}>
-              Custom categories make your insights
-              more meaningful and personal.
+            <Text style={styles.infoDescription}>
+              Whether it is subscriptions, hobbies, family
+              expenses, or anything else, create categories
+              that match your life.
             </Text>
           </View>
         </View>
 
         {/* Footer */}
-
         <View style={styles.footer}>
-          <View style={styles.footerLogo}>
-            <Image
-              source={require("../../assets/icon.png")}
-              style={styles.footerLogoImage}
-              resizeMode="contain"
-            />
-
-            <Text style={styles.footerBrand}>
-              SPENDLY
-            </Text>
-          </View>
+          <Text style={styles.footerBrand}>
+            Spendly
+          </Text>
 
           <Text style={styles.footerTagline}>
             Smart Spending, Brighter Tomorrows
           </Text>
 
-          <Text style={styles.footerSmall}>
-            Your finances. Your future. Your Spendly.
+          <Text style={styles.footerPro}>
+            ✦ PRO FEATURE
           </Text>
         </View>
       </ScrollView>
 
-      {/* Create / Edit Modal */}
-
+      {/* Add/Edit Modal */}
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={closeModal}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          style={styles.keyboardWrapper}
           behavior={
             Platform.OS === "ios"
               ? "padding"
@@ -550,766 +468,636 @@ export default function CustomCategoriesScreen() {
               : 20
           }
         >
-          <ScrollView
-            contentContainerStyle={
-              styles.modalScrollContent
-            }
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
+          <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              {/* Modal Header */}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={
+                  styles.modalScrollContent
+                }
+              >
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={styles.modalEyebrow}>
+                      {editingCategory
+                        ? "EDIT CATEGORY"
+                        : "NEW CATEGORY"}
+                    </Text>
 
-              <View style={styles.modalHeader}>
-                <View>
-                  <Text style={styles.modalTitle}>
-                    {editingCategory
-                      ? "Edit category"
-                      : "Create category"}
-                  </Text>
+                    <Text style={styles.modalTitle}>
+                      {editingCategory
+                        ? "Edit Category"
+                        : "Create Category"}
+                    </Text>
+                  </View>
 
-                  <Text style={styles.modalSubtitle}>
-                    {editingCategory
-                      ? "Update your category"
-                      : "Personalize your spending"}
-                  </Text>
+                  <Pressable
+                    style={styles.closeButton}
+                    onPress={closeModal}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={22}
+                      color="#475569"
+                    />
+                  </Pressable>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={closeModal}
+                {/* Name */}
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputLabel}>
+                    Category Name
+                  </Text>
+
+                  <View style={styles.inputWrapper}>
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={20}
+                      color="#64748B"
+                    />
+
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Subscriptions"
+                      placeholderTextColor="#94A3B8"
+                      value={name}
+                      onChangeText={setName}
+                      autoCapitalize="words"
+                      maxLength={30}
+                    />
+                  </View>
+                </View>
+
+                {/* Icon */}
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputLabel}>
+                    Choose an Icon
+                  </Text>
+
+                  <View style={styles.iconGrid}>
+                    {CATEGORY_ICONS.map((icon) => {
+                      const selected =
+                        selectedIcon === icon;
+
+                      return (
+                        <Pressable
+                          key={icon}
+                          style={[
+                            styles.iconOption,
+                            selected &&
+                              styles.iconOptionSelected,
+                          ]}
+                          onPress={() =>
+                            setSelectedIcon(icon)
+                          }
+                        >
+                          <Ionicons
+                            name={icon as any}
+                            size={23}
+                            color={
+                              selected
+                                ? "#2563EB"
+                                : "#64748B"
+                            }
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Save */}
+                <Pressable
+                  style={[
+                    styles.saveButton,
+                    saving &&
+                      styles.saveButtonDisabled,
+                  ]}
+                  onPress={saveCategory}
                   disabled={saving}
-                  activeOpacity={0.8}
                 >
                   <Ionicons
-                    name="close"
-                    size={20}
-                    color={TEXT}
+                    name={
+                      editingCategory
+                        ? "checkmark-circle-outline"
+                        : "add-circle-outline"
+                    }
+                    size={21}
+                    color="#FFFFFF"
                   />
-                </TouchableOpacity>
-              </View>
 
-              {/* Name */}
+                  <Text style={styles.saveButtonText}>
+                    {saving
+                      ? "Saving..."
+                      : editingCategory
+                      ? "Save Changes"
+                      : "Create Category"}
+                  </Text>
+                </Pressable>
 
-              <Text style={styles.inputLabel}>
-                Category name
-              </Text>
-
-              <View style={styles.inputContainer}>
-                <Ionicons
-                  name="text-outline"
-                  size={19}
-                  color={MUTED}
-                />
-
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. Pet Care"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  maxLength={30}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                />
-              </View>
-
-              {/* Icon */}
-
-              <Text style={styles.inputLabel}>
-                Choose an icon
-              </Text>
-
-              <View style={styles.iconGrid}>
-                {ICONS.map((icon) => {
-                  const selected =
-                    selectedIcon === icon;
-
-                  return (
-                    <TouchableOpacity
-                      key={icon}
-                      style={[
-                        styles.iconOption,
-                        selected &&
-                          styles.iconOptionSelected,
-                      ]}
-                      onPress={() =>
-                        setSelectedIcon(icon)
-                      }
-                      activeOpacity={0.75}
-                    >
-                      <Ionicons
-                        name={icon as any}
-                        size={20}
-                        color={
-                          selected
-                            ? BLUE
-                            : MUTED
-                        }
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Save */}
-
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  saving &&
-                    styles.saveButtonDisabled,
-                ]}
-                onPress={handleSave}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name={
-                    saving
-                      ? "sync-outline"
-                      : "checkmark-circle-outline"
-                  }
-                  size={19}
-                  color={WHITE}
-                />
-
-                <Text style={styles.saveButtonText}>
-                  {saving
-                    ? "Saving..."
-                    : editingCategory
-                    ? "Save changes"
-                    : "Create category"}
-                </Text>
-              </TouchableOpacity>
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                  disabled={saving}
+                >
+                  <Text style={styles.cancelButtonText}>
+                    Cancel
+                  </Text>
+                </Pressable>
+              </ScrollView>
             </View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-
   container: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 45,
+    flex: 1,
+    backgroundColor: "#F5F8FC",
   },
 
-  backgroundOrbTop: {
-    position: "absolute",
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor:
-      "rgba(37,99,235,0.07)",
-    top: -90,
-    right: -80,
-  },
-
-  backgroundOrbBottom: {
+  backgroundOrbOne: {
     position: "absolute",
     width: 230,
     height: 230,
     borderRadius: 115,
-    backgroundColor:
-      "rgba(184,138,36,0.06)",
-    bottom: 90,
-    left: -130,
+    backgroundColor: "rgba(37, 99, 235, 0.07)",
+    top: -90,
+    right: -80,
   },
 
-  /* Header */
+  backgroundOrbTwo: {
+    position: "absolute",
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: "rgba(184, 138, 36, 0.06)",
+    bottom: 120,
+    left: -90,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 58,
+    paddingBottom: 40,
+  },
 
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "rgba(255,255,255,0.75)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    elevation: 2,
-  },
-
-  headerText: {
-    flex: 1,
-    marginLeft: 13,
-  },
-
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: TEXT,
-    letterSpacing: -0.4,
-  },
-
-  headerSubtitle: {
-    marginTop: 3,
-    fontSize: 12,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  proBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor:
-      "rgba(184,138,36,0.11)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(184,138,36,0.22)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  /* Hero */
-
-  heroCard: {
-    overflow: "hidden",
-    borderRadius: 28,
-    padding: 22,
-    backgroundColor:
-      "rgba(255,255,255,0.76)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.07,
-    shadowRadius: 22,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    elevation: 3,
-    marginBottom: 15,
-  },
-
-  heroOrb: {
-    position: "absolute",
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor:
-      "rgba(37,99,235,0.07)",
-    right: -70,
-    top: -75,
-  },
-
-  heroIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(37,99,235,0.13)",
-    marginBottom: 16,
-  },
-
-  heroTitle: {
-    fontSize: 25,
-    lineHeight: 31,
-    fontWeight: "900",
-    color: TEXT,
-    letterSpacing: -0.7,
-  },
-
-  heroAccent: {
-    color: BLUE,
-  },
-
-  heroDescription: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 20,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  heroStats: {
-    marginTop: 20,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  statItem: {
-    flex: 1,
-  },
-
-  statValue: {
-    fontSize: 21,
-    fontWeight: "900",
-    color: BLUE,
-  },
-
-  statLabel: {
-    marginTop: 2,
-    fontSize: 9,
-    color: MUTED,
-    fontWeight: "700",
-  },
-
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor:
-      "rgba(15,23,42,0.08)",
-    marginHorizontal: 15,
-  },
-
-  /* Add */
-
-  addButton: {
-    minHeight: 76,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor:
-      "rgba(255,255,255,0.74)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(37,99,235,0.16)",
-    shadowColor: BLUE,
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 7,
-    },
-    elevation: 2,
-    marginBottom: 27,
-  },
-
-  addIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: BLUE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  addTextContainer: {
-    flex: 1,
-    marginLeft: 13,
-  },
-
-  addTitle: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: TEXT,
-  },
-
-  addSubtitle: {
-    marginTop: 3,
-    fontSize: 10,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  /* Section */
-
-  sectionHeader: {
-    marginBottom: 14,
-  },
-
-  sectionTitle: {
-    fontSize: 19,
-    fontWeight: "900",
-    color: TEXT,
-    letterSpacing: -0.3,
-  },
-
-  sectionSubtitle: {
-    marginTop: 4,
-    fontSize: 11,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  /* Category */
-
-  categoriesList: {
-    gap: 10,
-  },
-
-  categoryCard: {
-    minHeight: 73,
-    borderRadius: 20,
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor:
-      "rgba(255,255,255,0.74)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.045,
-    shadowRadius: 13,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    elevation: 2,
-  },
-
-  categoryIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(37,99,235,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  categoryInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  categoryName: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: TEXT,
-  },
-
-  categorySubtitle: {
-    marginTop: 3,
-    fontSize: 9,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "rgba(37,99,235,0.07)",
-    marginLeft: 7,
-  },
-
-  deleteActionButton: {
-    backgroundColor:
-      "rgba(220,38,38,0.07)",
-  },
-
-  /* Empty */
-
-  emptyCard: {
-    alignItems: "center",
-    borderRadius: 24,
-    padding: 28,
-    backgroundColor:
-      "rgba(255,255,255,0.70)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
-  },
-
-  emptyIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
-    marginBottom: 13,
-  },
-
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: TEXT,
-    textAlign: "center",
-  },
-
-  emptyDescription: {
-    marginTop: 7,
-    fontSize: 11,
-    lineHeight: 17,
-    color: MUTED,
-    textAlign: "center",
-    maxWidth: 280,
-  },
-
-  emptyButton: {
-    marginTop: 18,
-    paddingHorizontal: 18,
-    minHeight: 43,
-    borderRadius: 14,
-    backgroundColor: BLUE,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-  },
-
-  emptyButtonText: {
-    color: WHITE,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-
-  /* Insight */
-
-  insightCard: {
-    marginTop: 25,
-    borderRadius: 23,
-    padding: 17,
-    flexDirection: "row",
-    backgroundColor:
-      "rgba(184,138,36,0.08)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(184,138,36,0.18)",
-  },
-
-  insightIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "rgba(184,138,36,0.12)",
-    marginRight: 12,
-  },
-
-  insightContent: {
-    flex: 1,
-  },
-
-  insightLabel: {
-    fontSize: 8,
-    color: GOLD,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-
-  insightTitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: TEXT,
-    fontWeight: "900",
-  },
-
-  insightDescription: {
-    marginTop: 5,
-    fontSize: 10.5,
-    lineHeight: 16,
-    color: MUTED,
-    fontWeight: "500",
-  },
-
-  /* Footer */
-
-  footer: {
-    alignItems: "center",
-    marginTop: 25,
-  },
-
-  footerLogo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  footerLogoImage: {
-    width: 34,
-    height: 34,
-    marginRight: 8,
-  },
-
-  footerBrand: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: TEXT,
-    letterSpacing: 1.5,
-  },
-
-  footerTagline: {
-    marginTop: 7,
-    fontSize: 10,
-    color: GOLD,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-    textAlign: "center",
-  },
-
-  footerSmall: {
-    marginTop: 4,
-    fontSize: 9,
-    color: MUTED,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-
-  /* Modal */
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor:
-      "rgba(15,23,42,0.42)",
-    justifyContent: "center",
-  },
-
-  modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-
-  modalCard: {
-    width: "100%",
-    maxHeight: "92%",
-    borderRadius: 28,
-    padding: 22,
-    backgroundColor: WHITE,
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
-    shadowColor: "#000000",
-    shadowOpacity: 0.15,
-    shadowRadius: 30,
-    shadowOffset: {
-      width: 0,
-      height: 15,
-    },
-    elevation: 8,
-  },
-
-  modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     marginBottom: 22,
   },
 
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: TEXT,
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.76)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 13,
   },
 
-  modalSubtitle: {
-    marginTop: 4,
+  headerText: {
+    flex: 1,
+  },
+
+  eyebrow: {
     fontSize: 11,
-    color: MUTED,
+    fontWeight: "800",
+    letterSpacing: 2,
+    color: "#B88A24",
+    marginBottom: 5,
+  },
+
+  title: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#0F172A",
+    letterSpacing: -0.8,
+  },
+
+  subtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
     fontWeight: "500",
   },
 
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor:
-      "rgba(15,23,42,0.06)",
+  heroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.95)",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+  },
+
+  heroIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: "rgba(37,99,235,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: "auto",
+    marginRight: 14,
+  },
+
+  heroText: {
+    flex: 1,
+  },
+
+  heroTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+
+  heroDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+
+  addButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    marginBottom: 30,
+  },
+
+  addButtonIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  addButtonText: {
+    flex: 1,
+  },
+
+  addButtonTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  addButtonSubtitle: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 3,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+
+  sectionEyebrow: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.7,
+    color: "#94A3B8",
+    marginBottom: 4,
+  },
+
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  countBadge: {
+    minWidth: 34,
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    backgroundColor: "rgba(37,99,235,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  countText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#2563EB",
+  },
+
+  categoryList: {
+    gap: 12,
+  },
+
+  categoryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.76)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.95)",
+    borderRadius: 21,
+    padding: 14,
+  },
+
+  categoryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(37,99,235,0.09)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+
+  categoryInfo: {
+    flex: 1,
+  },
+
+  categoryName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  categoryDescription: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "500",
+  },
+
+  categoryActions: {
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  actionButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "rgba(37,99,235,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  deleteButton: {
+    backgroundColor: "rgba(220,38,38,0.07)",
+  },
+
+  emptyCard: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.95)",
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 30,
+    alignItems: "center",
+  },
+
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: "rgba(37,99,235,0.09)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+
+  emptyDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+    marginTop: 7,
+    maxWidth: 290,
+  },
+
+  emptyButton: {
+    marginTop: 18,
+    height: 43,
+    paddingHorizontal: 17,
+    borderRadius: 14,
+    backgroundColor: "rgba(37,99,235,0.09)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  emptyButtonText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  infoCard: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,250,238,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(184,138,36,0.16)",
+    borderRadius: 21,
+    padding: 15,
+    marginTop: 18,
+  },
+
+  infoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(184,138,36,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+  },
+
+  infoText: {
+    flex: 1,
+  },
+
+  infoTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+  },
+
+  infoDescription: {
+    fontSize: 11,
+    lineHeight: 17,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+
+  footer: {
+    alignItems: "center",
+    marginTop: 34,
+    paddingBottom: 15,
+  },
+
+  footerBrand: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#2563EB",
+    letterSpacing: 0.5,
+  },
+
+  footerTagline: {
+    marginTop: 4,
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+
+  footerPro: {
+    marginTop: 9,
+    fontSize: 9,
+    color: "#B88A24",
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+
+  keyboardWrapper: {
+    flex: 1,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.28)",
+    justifyContent: "flex-end",
+  },
+
+  modalCard: {
+    maxHeight: "88%",
+    backgroundColor: "#F8FAFD",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.95)",
+    paddingTop: 20,
+  },
+
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+
+  modalEyebrow: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.7,
+    color: "#B88A24",
+    marginBottom: 5,
+  },
+
+  modalTitle: {
+    fontSize: 23,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#EAF0F7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  inputSection: {
+    marginBottom: 22,
   },
 
   inputLabel: {
-    marginBottom: 8,
     fontSize: 11,
-    color: TEXT,
-    fontWeight: "900",
+    fontWeight: "800",
+    color: "#475569",
+    marginBottom: 8,
   },
 
-  inputContainer: {
-    minHeight: 52,
-    borderRadius: 15,
+  inputWrapper: {
+    height: 54,
+    borderRadius: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor:
-      "#F8FAFC",
-    borderWidth: 1,
-    borderColor:
-      "rgba(15,23,42,0.08)",
-    marginBottom: 20,
   },
 
   input: {
     flex: 1,
-    marginLeft: 9,
-    color: TEXT,
+    marginLeft: 10,
     fontSize: 14,
+    color: "#0F172A",
     fontWeight: "600",
-    paddingVertical: 0,
   },
 
   iconGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 9,
-    marginBottom: 23,
+    gap: 10,
   },
 
   iconOption: {
-    width: 43,
-    height: 43,
-    borderRadius: 13,
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor:
-      "#F8FAFC",
-    borderWidth: 1,
-    borderColor:
-      "rgba(15,23,42,0.07)",
   },
 
   iconOptionSelected: {
-    backgroundColor:
-      "rgba(37,99,235,0.10)",
-    borderColor:
-      "rgba(37,99,235,0.35)",
-    borderWidth: 1.5,
+    borderColor: "#2563EB",
+    backgroundColor: "rgba(37,99,235,0.08)",
   },
 
   saveButton: {
-    minHeight: 53,
-    borderRadius: 16,
-    backgroundColor: BLUE,
+    height: 53,
+    borderRadius: 17,
+    backgroundColor: "#2563EB",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
     gap: 8,
+    marginTop: 2,
   },
 
   saveButtonDisabled: {
@@ -1317,8 +1105,21 @@ const styles = StyleSheet.create({
   },
 
   saveButtonText: {
-    color: WHITE,
     fontSize: 13,
     fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  cancelButton: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+
+  cancelButtonText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#64748B",
   },
 });

@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -23,41 +24,42 @@ import {
     getSavingsGoals,
     SavingsGoal,
     updateSavingsGoal,
+    updateSavingsGoalAmount,
 } from "../db/database";
+import { requirePro } from "../services/proGuard";
 
 const BLUE = "#2563EB";
-const BLUE_DARK = "#1D4ED8";
 const GOLD = "#B88A24";
 const BG = "#F5F8FC";
-const TEXT = "#172033";
-const MUTED = "#718096";
-const BORDER = "rgba(255,255,255,0.85)";
+const TEXT = "#0F172A";
+const MUTED = "#64748B";
+const WHITE = "#FFFFFF";
+const GREEN = "#16A34A";
+const RED = "#DC2626";
 
 export default function SavingsGoalsScreen() {
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showGoalModal, setShowGoalModal] = useState(false);
-  const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
-
+  const [modalVisible, setModalVisible] = useState(false);
   const [editingGoal, setEditingGoal] =
     useState<SavingsGoal | null>(null);
 
-  const [selectedGoal, setSelectedGoal] =
-    useState<SavingsGoal | null>(null);
-
-  const [goalName, setGoalName] = useState("");
+  const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
-  const [targetDate, setTargetDate] = useState("");
-
-  const [moneyAmount, setMoneyAmount] = useState("");
+  const [savedAmount, setSavedAmount] = useState("");
   const [saving, setSaving] = useState(false);
 
-  /* ─────────────────────────────────────────────
-     LOAD GOALS
-  ───────────────────────────────────────────── */
+  const [addMoneyGoal, setAddMoneyGoal] =
+    useState<SavingsGoal | null>(null);
+  const [addMoneyAmount, setAddMoneyAmount] =
+    useState("");
 
   const loadGoals = async () => {
+    if (!(await requirePro())) {
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -65,15 +67,7 @@ export default function SavingsGoalsScreen() {
 
       setGoals(data);
     } catch (error) {
-      console.error(
-        "❌ SAVINGS GOALS LOAD ERROR:",
-        error
-      );
-
-      Alert.alert(
-        "Couldn't load goals",
-        "Please try again."
-      );
+      console.error("Failed to load savings goals:", error);
     } finally {
       setLoading(false);
     }
@@ -85,87 +79,64 @@ export default function SavingsGoalsScreen() {
     }, [])
   );
 
-  /* ─────────────────────────────────────────────
-     SUMMARY
-  ───────────────────────────────────────────── */
-
-  const summary = useMemo(() => {
-    const target = goals.reduce(
-      (sum, goal) => sum + Number(goal.target_amount),
-      0
-    );
-
-    const saved = goals.reduce(
-      (sum, goal) => sum + Number(goal.saved_amount),
-      0
-    );
-
-    const completed = goals.filter(
-      (goal) =>
-        Number(goal.saved_amount) >=
-        Number(goal.target_amount)
-    ).length;
-
-    const percentage =
-      target > 0
-        ? Math.min((saved / target) * 100, 100)
-        : 0;
-
-    return {
-      target,
-      saved,
-      completed,
-      percentage,
-    };
-  }, [goals]);
-
-  /* ─────────────────────────────────────────────
-     CREATE / UPDATE
-  ───────────────────────────────────────────── */
-
-  const resetGoalForm = () => {
-    setGoalName("");
+  const resetForm = () => {
+    setName("");
     setTargetAmount("");
-    setTargetDate("");
+    setSavedAmount("");
     setEditingGoal(null);
   };
 
   const openCreateModal = () => {
-    resetGoalForm();
-    setShowGoalModal(true);
+    resetForm();
+    setModalVisible(true);
   };
 
   const openEditModal = (goal: SavingsGoal) => {
     setEditingGoal(goal);
-    setGoalName(goal.name);
+    setName(goal.name);
     setTargetAmount(String(goal.target_amount));
-    setTargetDate(goal.target_date || "");
-    setShowGoalModal(true);
+    setSavedAmount(String(goal.saved_amount));
+    setModalVisible(true);
   };
 
-  const closeGoalModal = () => {
-    if (saving) return;
-
-    setShowGoalModal(false);
-    resetGoalForm();
+  const closeModal = () => {
+    setModalVisible(false);
+    resetForm();
   };
 
   const handleSaveGoal = async () => {
-    const name = goalName.trim();
-    const amount = Number(targetAmount);
+    const cleanName = name.trim();
+    const target = Number(targetAmount);
+    const saved = Number(savedAmount || "0");
 
-    if (!name) {
+    if (!cleanName) {
       Alert.alert(
-        "Goal name required",
+        "Missing name",
         "Please enter a name for your savings goal."
       );
       return;
     }
 
-    if (!targetAmount || amount <= 0) {
+    if (!target || target <= 0) {
       Alert.alert(
         "Invalid target",
         "Please enter a valid target amount."
+      );
+      return;
+    }
+
+    if (saved < 0) {
+      Alert.alert(
+        "Invalid amount",
+        "Saved amount cannot be negative."
+      );
+      return;
+    }
+
+    if (saved > target) {
+      Alert.alert(
+        "Amount too high",
+        "Saved amount cannot be greater than your target."
       );
       return;
     }
@@ -176,121 +147,42 @@ export default function SavingsGoalsScreen() {
       if (editingGoal) {
         await updateSavingsGoal(
           editingGoal.id,
-          name,
-          amount,
-          targetDate.trim()
+          cleanName,
+          target
         );
 
-        Alert.alert(
-          "Goal updated ✓",
-          "Your savings goal has been updated."
-        );
+        if (saved !== Number(editingGoal.saved_amount)) {
+          await updateSavingsGoalAmount(
+            editingGoal.id,
+            saved
+          );
+        }
       } else {
         await addSavingsGoal(
-          name,
-          amount,
-          targetDate.trim()
-        );
-
-        Alert.alert(
-          "Goal created 🎯",
-          "Your new savings goal is ready."
+          cleanName,
+          target,
+          saved
         );
       }
 
-      setShowGoalModal(false);
-      resetGoalForm();
-
+      closeModal();
       await loadGoals();
     } catch (error) {
-      console.error(
-        "❌ SAVINGS GOAL SAVE ERROR:",
-        error
-      );
+      console.error("Failed to save savings goal:", error);
 
       Alert.alert(
-        "Couldn't save goal",
-        "Something went wrong. Please try again."
+        "Something went wrong",
+        "Could not save your savings goal."
       );
     } finally {
       setSaving(false);
     }
   };
 
-  /* ─────────────────────────────────────────────
-     ADD MONEY
-  ───────────────────────────────────────────── */
-
-  const openAddMoneyModal = (
-    goal: SavingsGoal
-  ) => {
-    setSelectedGoal(goal);
-    setMoneyAmount("");
-    setShowAddMoneyModal(true);
-  };
-
-  const closeAddMoneyModal = () => {
-    if (saving) return;
-
-    setShowAddMoneyModal(false);
-    setSelectedGoal(null);
-    setMoneyAmount("");
-  };
-
-  const handleAddMoney = async () => {
-    if (!selectedGoal) return;
-
-    const amount = Number(moneyAmount);
-
-    if (!moneyAmount || amount <= 0) {
-      Alert.alert(
-        "Invalid amount",
-        "Please enter a valid amount to add."
-      );
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      await addToSavingsGoal(
-        selectedGoal.id,
-        amount
-      );
-
-      setShowAddMoneyModal(false);
-      setSelectedGoal(null);
-      setMoneyAmount("");
-
-      await loadGoals();
-
-      Alert.alert(
-        "Money added ✓",
-        `Rs. ${formatMoney(amount)} has been added to your goal.`
-      );
-    } catch (error) {
-      console.error(
-        "❌ ADD SAVINGS ERROR:",
-        error
-      );
-
-      Alert.alert(
-        "Couldn't add money",
-        "Something went wrong. Please try again."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  /* ─────────────────────────────────────────────
-     DELETE
-  ───────────────────────────────────────────── */
-
-  const handleDelete = (goal: SavingsGoal) => {
+  const handleDeleteGoal = (goal: SavingsGoal) => {
     Alert.alert(
       "Delete savings goal?",
-      `"${goal.name}" will be permanently removed.`,
+      `Are you sure you want to delete "${goal.name}"?`,
       [
         {
           text: "Cancel",
@@ -301,25 +193,17 @@ export default function SavingsGoalsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteSavingsGoal(
-                goal.id
-              );
-
+              await deleteSavingsGoal(goal.id);
               await loadGoals();
-
-              Alert.alert(
-                "Goal deleted",
-                "The savings goal has been removed."
-              );
             } catch (error) {
               console.error(
-                "❌ SAVINGS GOAL DELETE ERROR:",
+                "Failed to delete savings goal:",
                 error
               );
 
               Alert.alert(
-                "Couldn't delete goal",
-                "Please try again."
+                "Something went wrong",
+                "Could not delete this savings goal."
               );
             }
           },
@@ -328,337 +212,299 @@ export default function SavingsGoalsScreen() {
     );
   };
 
-  /* ─────────────────────────────────────────────
-     HELPERS
-  ───────────────────────────────────────────── */
-
-  const formatMoney = (value: number) => {
-    return Math.round(value).toLocaleString(
-      "en-US"
-    );
+  const openAddMoneyModal = (goal: SavingsGoal) => {
+    setAddMoneyGoal(goal);
+    setAddMoneyAmount("");
   };
 
-  const getProgress = (
-    goal: SavingsGoal
-  ) => {
-    if (
-      Number(goal.target_amount) <= 0
-    ) {
+  const closeAddMoneyModal = () => {
+    setAddMoneyGoal(null);
+    setAddMoneyAmount("");
+  };
+
+  const handleAddMoney = async () => {
+    if (!addMoneyGoal) return;
+
+    const amount = Number(addMoneyAmount);
+
+    if (!amount || amount <= 0) {
+      Alert.alert(
+        "Invalid amount",
+        "Please enter a valid amount to add."
+      );
+      return;
+    }
+
+    const currentSaved = Number(
+      addMoneyGoal.saved_amount
+    );
+
+    const target = Number(
+      addMoneyGoal.target_amount
+    );
+
+    if (currentSaved + amount > target) {
+      Alert.alert(
+        "Amount too high",
+        "This amount would take you above your savings target."
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      await addToSavingsGoal(
+        addMoneyGoal.id,
+        amount
+      );
+
+      closeAddMoneyModal();
+      await loadGoals();
+    } catch (error) {
+      console.error(
+        "Failed to add money to savings goal:",
+        error
+      );
+
+      Alert.alert(
+        "Something went wrong",
+        "Could not update this savings goal."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `Rs. ${Math.round(amount).toLocaleString(
+      "en-LK"
+    )}`;
+  };
+
+  const getProgress = (goal: SavingsGoal) => {
+    const target = Number(goal.target_amount);
+
+    if (!target || target <= 0) {
       return 0;
     }
 
     return Math.min(
+      100,
       (Number(goal.saved_amount) /
-        Number(goal.target_amount)) *
-        100,
-      100
+        target) *
+        100
     );
   };
 
-  const getRemaining = (
-    goal: SavingsGoal
-  ) => {
+  const getRemaining = (goal: SavingsGoal) => {
     return Math.max(
+      0,
       Number(goal.target_amount) -
-        Number(goal.saved_amount),
-      0
+        Number(goal.saved_amount)
     );
   };
 
-  const isCompleted = (
-    goal: SavingsGoal
-  ) => {
-    return (
-      Number(goal.saved_amount) >=
-      Number(goal.target_amount)
-    );
-  };
+  const totalTarget = goals.reduce(
+    (sum, goal) =>
+      sum + Number(goal.target_amount),
+    0
+  );
 
-  const formatTargetDate = (
-    date: string
-  ) => {
-    if (!date) return "";
+  const totalSaved = goals.reduce(
+    (sum, goal) =>
+      sum + Number(goal.saved_amount),
+    0
+  );
 
-    const parsed = new Date(date);
-
-    if (isNaN(parsed.getTime())) {
-      return date;
-    }
-
-    return parsed.toLocaleDateString(
-      "en-US",
-      {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }
-    );
-  };
-
-  /* ─────────────────────────────────────────────
-     LOADING
-  ───────────────────────────────────────────── */
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator
-            size="large"
-            color={BLUE}
-          />
-
-          <Text style={styles.loadingText}>
-            Loading savings goals...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  /* ─────────────────────────────────────────────
-     SCREEN
-  ───────────────────────────────────────────── */
+  const overallProgress =
+    totalTarget > 0
+      ? Math.min(
+          100,
+          (totalSaved / totalTarget) * 100
+        )
+      : 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.backgroundDecorOne} />
-      <View style={styles.backgroundDecorTwo} />
+      <View style={styles.backgroundOrbTop} />
+      <View style={styles.backgroundOrbBottom} />
 
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={
-          styles.contentContainer
-        }
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={
+          styles.container
+        }
       >
-        {/* HEADER */}
-
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() =>
-              router.replace("/pro")
-            }
+            onPress={() => router.back()}
             activeOpacity={0.8}
           >
             <Ionicons
               name="arrow-back"
-              size={21}
+              size={22}
               color={TEXT}
             />
           </TouchableOpacity>
 
-          <View style={styles.headerText}>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>
-                Savings Goals
-              </Text>
-
-              <View style={styles.proBadge}>
-                <Ionicons
-                  name="diamond"
-                  size={10}
-                  color={GOLD}
-                />
-
-                <Text
-                  style={styles.proBadgeText}
-                >
-                  PRO
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.subtitle}>
-              Save with purpose. Grow with
-              confidence.
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>
+              Savings Goals
             </Text>
+
+            <Text
+              style={styles.headerSubtitle}
+            >
+              Turn your plans into progress
+            </Text>
+          </View>
+
+          <View style={styles.proBadge}>
+            <Ionicons
+              name="diamond"
+              size={15}
+              color={GOLD}
+            />
           </View>
         </View>
 
-        {/* SUMMARY CARD */}
+        {/* Overview */}
+        <View style={styles.overviewCard}>
+          <View style={styles.overviewGlow} />
 
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryGlow} />
-
-          <View style={styles.summaryTop}>
+          <View style={styles.overviewTopRow}>
             <View>
-              <Text style={styles.summaryLabel}>
-                TOTAL SAVED
+              <Text style={styles.eyebrow}>
+                SAVINGS JOURNEY
               </Text>
 
-              <Text
-                style={styles.summaryAmount}
-              >
-                Rs.{" "}
-                {formatMoney(
-                  summary.saved
-                )}
+              <Text style={styles.overviewTitle}>
+                {formatCurrency(totalSaved)}
+              </Text>
+
+              <Text style={styles.overviewSubtitle}>
+                saved across {goals.length}{" "}
+                {goals.length === 1
+                  ? "goal"
+                  : "goals"}
               </Text>
             </View>
 
-            <View style={styles.summaryIcon}>
+            <View style={styles.overviewIcon}>
               <Ionicons
-                name="trending-up"
-                size={24}
-                color={BLUE}
+                name="sparkles-outline"
+                size={23}
+                color={GOLD}
               />
             </View>
           </View>
 
-          <View style={styles.summaryStats}>
-            <View>
-              <Text
-                style={styles.statLabel}
-              >
-                TARGET
-              </Text>
-
-              <Text
-                style={styles.statValue}
-              >
-                Rs.{" "}
-                {formatMoney(
-                  summary.target
-                )}
-              </Text>
-            </View>
-
-            <View>
-              <Text
-                style={styles.statLabel}
-              >
-                PROGRESS
-              </Text>
-
-              <Text
-                style={styles.statValue}
-              >
-                {summary.percentage.toFixed(
-                  0
-                )}
-                %
-              </Text>
-            </View>
-
-            <View>
-              <Text
-                style={styles.statLabel}
-              >
-                COMPLETED
-              </Text>
-
-              <Text
-                style={styles.statValue}
-              >
-                {summary.completed}
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={
-              styles.summaryProgressTrack
-            }
-          >
+          <View style={styles.overviewProgressTrack}>
             <View
               style={[
-                styles.summaryProgressFill,
+                styles.overviewProgressFill,
                 {
-                  width: `${summary.percentage}%`,
+                  width: `${overallProgress}%`,
                 },
               ]}
             />
           </View>
+
+          <View style={styles.overviewBottomRow}>
+            <Text style={styles.overviewProgressText}>
+              {Math.round(
+                overallProgress
+              )}
+              % complete
+            </Text>
+
+            <Text style={styles.overviewTargetText}>
+              Target{" "}
+              {formatCurrency(totalTarget)}
+            </Text>
+          </View>
         </View>
 
-        {/* ADD BUTTON */}
-
+        {/* Add button */}
         <TouchableOpacity
-          style={styles.addGoalButton}
+          style={styles.addButton}
           onPress={openCreateModal}
           activeOpacity={0.85}
         >
-          <View style={styles.addIcon}>
+          <View style={styles.addButtonIcon}>
             <Ionicons
               name="add"
-              size={22}
-              color="#FFFFFF"
+              size={21}
+              color={WHITE}
             />
           </View>
 
-          <View style={styles.addText}>
-            <Text style={styles.addTitle}>
-              Create Savings Goal
+          <View style={styles.addButtonContent}>
+            <Text style={styles.addButtonTitle}>
+              Create savings goal
             </Text>
 
-            <Text style={styles.addSubtitle}>
-              Give your next milestone a
-              purpose.
+            <Text style={styles.addButtonSubtitle}>
+              Give your next milestone a purpose
             </Text>
           </View>
 
           <Ionicons
             name="chevron-forward"
             size={19}
-            color="#FFFFFF"
+            color={MUTED}
           />
         </TouchableOpacity>
 
-        {/* SECTION HEADER */}
-
+        {/* Goals */}
         <View style={styles.sectionHeader}>
           <View>
-            <Text
-              style={styles.sectionTitle}
-            >
-              Your Goals
+            <Text style={styles.sectionTitle}>
+              Your goals
             </Text>
 
-            <Text
-              style={styles.sectionSubtitle}
-            >
-              {goals.length === 0
-                ? "Start your first goal"
-                : `${goals.length} goal${
-                    goals.length === 1
-                      ? ""
-                      : "s"
-                  } in progress`}
+            <Text style={styles.sectionSubtitle}>
+              Keep moving toward what matters
             </Text>
           </View>
+
+          <Text style={styles.goalCount}>
+            {goals.length}
+          </Text>
         </View>
 
-        {/* EMPTY STATE */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color={BLUE}
+            />
 
-        {goals.length === 0 && (
+            <Text style={styles.loadingText}>
+              Loading your goals...
+            </Text>
+          </View>
+        ) : goals.length === 0 ? (
           <View style={styles.emptyCard}>
-            <View
-              style={styles.emptyIcon}
-            >
+            <View style={styles.emptyIcon}>
               <Ionicons
                 name="flag-outline"
-                size={30}
+                size={28}
                 color={BLUE}
               />
             </View>
 
-            <Text
-              style={styles.emptyTitle}
-            >
-              Start saving toward something
-              meaningful
+            <Text style={styles.emptyTitle}>
+              No savings goals yet
             </Text>
 
-            <Text
-              style={styles.emptyText}
-            >
-              Whether it's a new laptop,
-              trip, education, or emergency
-              fund, give your money a
-              destination.
+            <Text style={styles.emptyText}>
+              Create your first goal and start
+              building toward something
+              meaningful.
             </Text>
 
             <TouchableOpacity
@@ -666,406 +512,341 @@ export default function SavingsGoalsScreen() {
               onPress={openCreateModal}
               activeOpacity={0.85}
             >
+              <Ionicons
+                name="add"
+                size={17}
+                color={WHITE}
+              />
+
               <Text
-                style={
-                  styles.emptyButtonText
-                }
+                style={styles.emptyButtonText}
               >
-                Create Your First Goal
+                Create a goal
               </Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : (
+          <View style={styles.goalList}>
+            {goals.map((goal) => {
+              const progress =
+                getProgress(goal);
 
-        {/* GOALS */}
+              const remaining =
+                getRemaining(goal);
 
-        {goals.map((goal) => {
-          const progress =
-            getProgress(goal);
+              const completed =
+                progress >= 100;
 
-          const completed =
-            isCompleted(goal);
-
-          return (
-            <View
-              key={goal.id}
-              style={[
-                styles.goalCard,
-                completed &&
-                  styles.completedCard,
-              ]}
-            >
-              {/* CARD TOP */}
-
-              <View
-                style={styles.goalTop}
-              >
+              return (
                 <View
-                  style={[
-                    styles.goalIcon,
-                    completed &&
-                      styles.completedIcon,
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      completed
-                        ? "checkmark"
-                        : "flag-outline"
-                    }
-                    size={21}
-                    color={
-                      completed
-                        ? "#FFFFFF"
-                        : BLUE
-                    }
-                  />
-                </View>
-
-                <View
-                  style={styles.goalInfo}
+                  key={goal.id}
+                  style={styles.goalCard}
                 >
                   <View
                     style={
-                      styles.goalTitleRow
+                      styles.goalCardTop
+                    }
+                  >
+                    <View
+                      style={
+                        styles.goalIcon
+                      }
+                    >
+                      <Ionicons
+                        name={
+                          completed
+                            ? "checkmark-circle"
+                            : "flag-outline"
+                        }
+                        size={21}
+                        color={
+                          completed
+                            ? GREEN
+                            : BLUE
+                        }
+                      />
+                    </View>
+
+                    <View
+                      style={
+                        styles.goalHeaderContent
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.goalName
+                        }
+                      >
+                        {goal.name}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.goalTarget
+                        }
+                      >
+                        Target{" "}
+                        {formatCurrency(
+                          Number(
+                            goal.target_amount
+                          )
+                        )}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={
+                        styles.moreButton
+                      }
+                      onPress={() =>
+                        Alert.alert(
+                          goal.name,
+                          "Choose an action",
+                          [
+                            {
+                              text: "Edit",
+                              onPress: () =>
+                                openEditModal(
+                                  goal
+                                ),
+                            },
+                            {
+                              text: "Delete",
+                              style:
+                                "destructive",
+                              onPress: () =>
+                                handleDeleteGoal(
+                                  goal
+                                ),
+                            },
+                            {
+                              text: "Cancel",
+                              style:
+                                "cancel",
+                            },
+                          ]
+                        )
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={19}
+                        color={MUTED}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View
+                    style={
+                      styles.amountRow
+                    }
+                  >
+                    <View>
+                      <Text
+                        style={
+                          styles.savedLabel
+                        }
+                      >
+                        SAVED
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.savedAmount
+                        }
+                      >
+                        {formatCurrency(
+                          Number(
+                            goal.saved_amount
+                          )
+                        )}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.percentageBadge
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.percentageText
+                        }
+                      >
+                        {Math.round(
+                          progress
+                        )}
+                        %
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={
+                      styles.progressTrack
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${progress}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  <View
+                    style={
+                      styles.goalBottomRow
                     }
                   >
                     <Text
                       style={
-                        styles.goalName
+                        styles.remainingText
                       }
-                      numberOfLines={1}
                     >
-                      {goal.name}
+                      {completed
+                        ? "Goal completed 🎉"
+                        : `${formatCurrency(
+                            remaining
+                          )} remaining`}
                     </Text>
 
-                    {completed && (
-                      <View
-                        style={
-                          styles.completeBadge
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.completeBadgeText
-                          }
-                        >
-                          COMPLETE
-                        </Text>
-                      </View>
-                    )}
+                    <Text
+                      style={
+                        styles.progressSmall
+                      }
+                    >
+                      {Math.round(
+                        progress
+                      )}
+                      /100
+                    </Text>
                   </View>
 
-                  {goal.target_date ? (
-                    <View
+                  {!completed && (
+                    <TouchableOpacity
                       style={
-                        styles.dateRow
+                        styles.addMoneyButton
+                      }
+                      onPress={() =>
+                        openAddMoneyModal(
+                          goal
+                        )
+                      }
+                      activeOpacity={
+                        0.85
                       }
                     >
                       <Ionicons
-                        name="calendar-outline"
-                        size={12}
-                        color={MUTED}
+                        name="add-circle-outline"
+                        size={18}
+                        color={BLUE}
                       />
 
                       <Text
                         style={
-                          styles.dateText
+                          styles.addMoneyText
                         }
                       >
-                        Target:{" "}
-                        {formatTargetDate(
-                          goal.target_date
-                        )}
+                        Add money
                       </Text>
-                    </View>
-                  ) : (
-                    <Text
-                      style={
-                        styles.noDateText
-                      }
-                    >
-                      No target date
-                    </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
+              );
+            })}
+          </View>
+        )}
 
-                <TouchableOpacity
-                  style={
-                    styles.moreButton
-                  }
-                  onPress={() =>
-                    Alert.alert(
-                      goal.name,
-                      "Choose an action.",
-                      [
-                        {
-                          text: "Edit",
-                          onPress: () =>
-                            openEditModal(
-                              goal
-                            ),
-                        },
-                        {
-                          text: "Delete",
-                          style:
-                            "destructive",
-                          onPress: () =>
-                            handleDelete(
-                              goal
-                            ),
-                        },
-                        {
-                          text: "Cancel",
-                          style:
-                            "cancel",
-                        },
-                      ]
-                    )
-                  }
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="ellipsis-horizontal"
-                    size={19}
-                    color={MUTED}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* AMOUNTS */}
-
-              <View
-                style={
-                  styles.amountRow
-                }
-              >
-                <View>
-                  <Text
-                    style={
-                      styles.savedLabel
-                    }
-                  >
-                    SAVED
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.savedAmount
-                    }
-                  >
-                    Rs.{" "}
-                    {formatMoney(
-                      goal.saved_amount
-                    )}
-                  </Text>
-                </View>
-
-                <View
-                  style={
-                    styles.targetAmountContainer
-                  }
-                >
-                  <Text
-                    style={
-                      styles.savedLabel
-                    }
-                  >
-                    TARGET
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.targetAmount
-                    }
-                  >
-                    Rs.{" "}
-                    {formatMoney(
-                      goal.target_amount
-                    )}
-                  </Text>
-                </View>
-              </View>
-
-              {/* PROGRESS */}
-
-              <View
-                style={
-                  styles.progressTrack
-                }
-              >
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${progress}%`,
-                    },
-                    completed &&
-                      styles.completedProgress,
-                  ]}
-                />
-              </View>
-
-              <View
-                style={
-                  styles.progressBottom
-                }
-              >
-                <Text
-                  style={
-                    styles.progressText
-                  }
-                >
-                  {progress.toFixed(0)}%
-                  complete
-                </Text>
-
-                {!completed && (
-                  <Text
-                    style={
-                      styles.remainingText
-                    }
-                  >
-                    Rs.{" "}
-                    {formatMoney(
-                      getRemaining(
-                        goal
-                      )
-                    )}{" "}
-                    remaining
-                  </Text>
-                )}
-
-                {completed && (
-                  <Text
-                    style={
-                      styles.completedText
-                    }
-                  >
-                    Goal achieved 🎉
-                  </Text>
-                )}
-              </View>
-
-              {/* ADD MONEY */}
-
-              {!completed && (
-                <TouchableOpacity
-                  style={
-                    styles.addMoneyButton
-                  }
-                  onPress={() =>
-                    openAddMoneyModal(
-                      goal
-                    )
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={18}
-                    color={BLUE}
-                  />
-
-                  <Text
-                    style={
-                      styles.addMoneyText
-                    }
-                  >
-                    Add Money
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
-
-        {/* PRO TIP */}
-
-        <View style={styles.tipCard}>
-          <View style={styles.tipIcon}>
+        {/* Premium insight */}
+        <View style={styles.insightCard}>
+          <View style={styles.insightIcon}>
             <Ionicons
               name="bulb-outline"
-              size={19}
+              size={22}
               color={GOLD}
             />
           </View>
 
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>
-              Spendly Tip
+          <View style={styles.insightContent}>
+            <Text style={styles.insightLabel}>
+              SPENDLY PRO
             </Text>
 
-            <Text style={styles.tipText}>
-              Small, consistent contributions
-              can turn big goals into
-              achievable milestones.
+            <Text style={styles.insightTitle}>
+              Small progress still counts.
+            </Text>
+
+            <Text
+              style={
+                styles.insightDescription
+              }
+            >
+              Keep your goals visible and
+              contribute consistently. Your
+              future self will thank you.
             </Text>
           </View>
         </View>
 
-        {/* FOOTER */}
-
+        {/* Footer */}
         <View style={styles.footer}>
-          <View
-            style={styles.footerLogo}
-          >
+          <View style={styles.footerLogo}>
             <Image
               source={require("../../assets/icon.png")}
-              style={
-                styles.footerLogoImage
-              }
+              style={styles.footerLogoImage}
               resizeMode="contain"
             />
 
-            <View>
-              <Text
-                style={
-                  styles.footerBrand
-                }
-              >
-                Spendly
-              </Text>
-
-              <Text
-                style={
-                  styles.footerTagline
-                }
-              >
-                Smart Spending, Brighter
-                Tomorrows
-              </Text>
-            </View>
+            <Text style={styles.footerBrand}>
+              SPENDLY
+            </Text>
           </View>
 
           <Text
-            style={styles.footerPro}
+            style={styles.footerTagline}
           >
-            Savings Goals · Pro
+            Smart Spending, Brighter Tomorrows
+          </Text>
+
+          <Text
+            style={styles.footerSmall}
+          >
+            Build the future you want, one
+            goal at a time.
           </Text>
         </View>
       </ScrollView>
 
-      {/* ─────────────────────────────────────────
-         CREATE / EDIT GOAL MODAL
-      ───────────────────────────────────────── */}
-
-      {showGoalModal && (
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            style={styles.keyboardWrapper}
-            behavior={
-              Platform.OS === "ios"
-                ? "padding"
-                : "height"
-            }
-            keyboardVerticalOffset={
-              Platform.OS === "ios"
-                ? 0
-                : 20
-            }
+      {/* Create / Edit Goal Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeModal}
+      >
+        <KeyboardAvoidingView
+          style={styles.keyboardWrapper}
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : "height"
+          }
+          keyboardVerticalOffset={
+            Platform.OS === "ios"
+              ? 0
+              : 20
+          }
+        >
+          <View
+            style={styles.modalOverlay}
           >
-            <View style={styles.modalCard}>
+            <View
+              style={styles.modalCard}
+            >
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={
@@ -1078,6 +859,12 @@ export default function SavingsGoalsScreen() {
               >
                 <View
                   style={
+                    styles.modalHandle
+                  }
+                />
+
+                <View
+                  style={
                     styles.modalHeader
                   }
                 >
@@ -1088,8 +875,8 @@ export default function SavingsGoalsScreen() {
                       }
                     >
                       {editingGoal
-                        ? "Edit Goal"
-                        : "New Savings Goal"}
+                        ? "Edit goal"
+                        : "Create savings goal"}
                     </Text>
 
                     <Text
@@ -1098,8 +885,8 @@ export default function SavingsGoalsScreen() {
                       }
                     >
                       {editingGoal
-                        ? "Update your milestone."
-                        : "Give your money a destination."}
+                        ? "Update your savings target"
+                        : "Give your money a destination"}
                     </Text>
                   </View>
 
@@ -1108,129 +895,155 @@ export default function SavingsGoalsScreen() {
                       styles.modalClose
                     }
                     onPress={
-                      closeGoalModal
+                      closeModal
                     }
-                    disabled={saving}
+                    activeOpacity={
+                      0.8
+                    }
                   >
                     <Ionicons
                       name="close"
                       size={20}
-                      color={TEXT}
+                      color={
+                        TEXT
+                      }
                     />
                   </TouchableOpacity>
                 </View>
 
-                <Text
-                  style={styles.inputLabel}
-                >
-                  GOAL NAME
-                </Text>
-
                 <View
                   style={
-                    styles.inputContainer
-                  }
-                >
-                  <Ionicons
-                    name="flag-outline"
-                    size={18}
-                    color={BLUE}
-                  />
-
-                  <TextInput
-                    value={goalName}
-                    onChangeText={
-                      setGoalName
-                    }
-                    placeholder="e.g. New Laptop"
-                    placeholderTextColor="#A0A9B8"
-                    style={
-                      styles.input
-                    }
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                </View>
-
-                <Text
-                  style={styles.inputLabel}
-                >
-                  TARGET AMOUNT
-                </Text>
-
-                <View
-                  style={
-                    styles.inputContainer
+                    styles.inputGroup
                   }
                 >
                   <Text
                     style={
-                      styles.currencyText
+                      styles.inputLabel
                     }
                   >
-                    Rs.
+                    GOAL NAME
                   </Text>
 
-                  <TextInput
-                    value={
-                      targetAmount
-                    }
-                    onChangeText={
-                      setTargetAmount
-                    }
-                    placeholder="250000"
-                    placeholderTextColor="#A0A9B8"
-                    keyboardType="numeric"
+                  <View
                     style={
-                      styles.input
+                      styles.inputWrapper
                     }
-                    returnKeyType="next"
-                  />
+                  >
+                    <Ionicons
+                      name="flag-outline"
+                      size={18}
+                      color={
+                        MUTED
+                      }
+                    />
+
+                    <TextInput
+                      value={
+                        name
+                      }
+                      onChangeText={
+                        setName
+                      }
+                      placeholder="e.g. New laptop"
+                      placeholderTextColor="#94A3B8"
+                      style={
+                        styles.input
+                      }
+                      returnKeyType="next"
+                    />
+                  </View>
                 </View>
-
-                <Text
-                  style={styles.inputLabel}
-                >
-                  TARGET DATE{" "}
-                  <Text
-                    style={
-                      styles.optionalText
-                    }
-                  >
-                    (optional)
-                  </Text>
-                </Text>
 
                 <View
                   style={
-                    styles.inputContainer
+                    styles.inputGroup
                   }
                 >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={18}
-                    color={BLUE}
-                  />
-
-                  <TextInput
-                    value={
-                      targetDate
-                    }
-                    onChangeText={
-                      setTargetDate
-                    }
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#A0A9B8"
+                  <Text
                     style={
-                      styles.input
+                      styles.inputLabel
                     }
-                    returnKeyType="done"
-                  />
+                  >
+                    TARGET AMOUNT
+                  </Text>
+
+                  <View
+                    style={
+                      styles.inputWrapper
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.currencySymbol
+                      }
+                    >
+                      Rs.
+                    </Text>
+
+                    <TextInput
+                      value={
+                        targetAmount
+                      }
+                      onChangeText={
+                        setTargetAmount
+                      }
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      style={
+                        styles.input
+                      }
+                      returnKeyType="next"
+                    />
+                  </View>
+                </View>
+
+                <View
+                  style={
+                    styles.inputGroup
+                  }
+                >
+                  <Text
+                    style={
+                      styles.inputLabel
+                    }
+                  >
+                    ALREADY SAVED
+                  </Text>
+
+                  <View
+                    style={
+                      styles.inputWrapper
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.currencySymbol
+                      }
+                    >
+                      Rs.
+                    </Text>
+
+                    <TextInput
+                      value={
+                        savedAmount
+                      }
+                      onChangeText={
+                        setSavedAmount
+                      }
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                      style={
+                        styles.input
+                      }
+                    />
+                  </View>
                 </View>
 
                 <TouchableOpacity
                   style={
-                    styles.primaryButton
+                    styles.saveButton
                   }
                   onPress={
                     handleSaveGoal
@@ -1240,11 +1053,13 @@ export default function SavingsGoalsScreen() {
                   }
                   activeOpacity={
                     0.85
-                  }
+                }
                 >
                   {saving ? (
                     <ActivityIndicator
-                      color="#FFFFFF"
+                      color={
+                        WHITE
+                      }
                     />
                   ) : (
                     <>
@@ -1254,148 +1069,229 @@ export default function SavingsGoalsScreen() {
                             ? "checkmark"
                             : "add"
                         }
-                        size={19}
-                        color="#FFFFFF"
+                        size={
+                          19
+                        }
+                        color={
+                          WHITE
+                        }
                       />
 
                       <Text
                         style={
-                          styles.primaryButtonText
+                          styles.saveButtonText
                         }
                       >
                         {editingGoal
-                          ? "Save Changes"
-                          : "Create Goal"}
+                          ? "Update goal"
+                          : "Create goal"}
                       </Text>
                     </>
                   )}
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={
+                    styles.cancelButton
+                  }
+                  onPress={
+                    closeModal
+                  }
+                  activeOpacity={
+                    0.8
+                  }
+                >
+                  <Text
+                    style={
+                      styles.cancelButtonText
+                    }
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
-          </KeyboardAvoidingView>
-        </View>
-      )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-      {/* ─────────────────────────────────────────
-         ADD MONEY MODAL
-      ───────────────────────────────────────── */}
-
-      {showAddMoneyModal &&
-        selectedGoal && (
+      {/* Add Money Modal */}
+      <Modal
+        visible={
+          Boolean(
+            addMoneyGoal
+          )
+        }
+        transparent
+        animationType="slide"
+        onRequestClose={
+          closeAddMoneyModal
+        }
+      >
+        <KeyboardAvoidingView
+          style={styles.keyboardWrapper}
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : "height"
+          }
+          keyboardVerticalOffset={
+            Platform.OS === "ios"
+              ? 0
+              : 20
+          }
+        >
           <View
-            style={
-              styles.modalOverlay
-            }
+            style={styles.modalOverlay}
           >
-            <KeyboardAvoidingView
-              style={
-                styles.keyboardWrapper
-              }
-              behavior={
-                Platform.OS === "ios"
-                  ? "padding"
-                  : "height"
-              }
-              keyboardVerticalOffset={
-                Platform.OS === "ios"
-                  ? 0
-                  : 20
-              }
+            <View
+              style={styles.modalCard}
             >
-              <View
-                style={
-                  styles.modalCard
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={
+                  false
                 }
+                contentContainerStyle={
+                  styles.modalScrollContent
+                }
+                bounces={false}
               >
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={
-                    false
+                <View
+                  style={
+                    styles.modalHandle
                   }
-                  contentContainerStyle={
-                    styles.modalScrollContent
+                />
+
+                <View
+                  style={
+                    styles.modalHeader
                   }
-                  bounces={false}
                 >
                   <View
                     style={
-                      styles.modalHeader
+                      styles.addMoneyHeader
                     }
                   >
+                    <View
+                      style={
+                        styles.addMoneyModalIcon
+                      }
+                    >
+                      <Ionicons
+                        name="wallet-outline"
+                        size={21}
+                        color={
+                          BLUE
+                        }
+                      />
+                    </View>
+
                     <View>
                       <Text
                         style={
                           styles.modalTitle
                         }
                       >
-                        Add Money
+                        Add money
                       </Text>
 
                       <Text
                         style={
                           styles.modalSubtitle
                         }
-                        numberOfLines={2}
                       >
-                        {selectedGoal.name}
+                        {addMoneyGoal?.name}
                       </Text>
                     </View>
+                  </View>
 
-                    <TouchableOpacity
+                  <TouchableOpacity
+                    style={
+                      styles.modalClose
+                    }
+                    onPress={
+                      closeAddMoneyModal
+                    }
+                    activeOpacity={
+                      0.8
+                    }
+                  >
+                    <Ionicons
+                      name="close"
+                      size={20}
+                      color={
+                        TEXT
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View
+                  style={
+                    styles.moneySummary
+                  }
+                >
+                  <View>
+                    <Text
                       style={
-                        styles.modalClose
-                      }
-                      onPress={
-                        closeAddMoneyModal
-                      }
-                      disabled={
-                        saving
+                        styles.moneySummaryLabel
                       }
                     >
-                      <Ionicons
-                        name="close"
-                        size={20}
-                        color={TEXT}
-                      />
-                    </TouchableOpacity>
+                      CURRENTLY SAVED
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.moneySummaryValue
+                      }
+                    >
+                      {addMoneyGoal
+                        ? formatCurrency(
+                            Number(
+                              addMoneyGoal.saved_amount
+                            )
+                          )
+                        : "Rs. 0"}
+                    </Text>
                   </View>
 
                   <View
                     style={
-                      styles.moneyProgressCard
+                      styles.moneySummaryDivider
                     }
-                  >
+                  />
+
+                  <View>
                     <Text
                       style={
-                        styles.moneyProgressLabel
+                        styles.moneySummaryLabel
                       }
                     >
-                      CURRENT PROGRESS
+                      TARGET
                     </Text>
 
                     <Text
                       style={
-                        styles.moneyProgressAmount
+                        styles.moneySummaryValue
                       }
                     >
-                      Rs.{" "}
-                      {formatMoney(
-                        selectedGoal.saved_amount
-                      )}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.moneyProgressTarget
-                      }
-                    >
-                      of Rs.{" "}
-                      {formatMoney(
-                        selectedGoal.target_amount
-                      )}
+                      {addMoneyGoal
+                        ? formatCurrency(
+                            Number(
+                              addMoneyGoal.target_amount
+                            )
+                          )
+                        : "Rs. 0"}
                     </Text>
                   </View>
+                </View>
 
+                <View
+                  style={
+                    styles.inputGroup
+                  }
+                >
                   <Text
                     style={
                       styles.inputLabel
@@ -1406,12 +1302,12 @@ export default function SavingsGoalsScreen() {
 
                   <View
                     style={
-                      styles.inputContainer
+                      styles.inputWrapper
                     }
                   >
                     <Text
                       style={
-                        styles.currencyText
+                        styles.currencySymbol
                       }
                     >
                       Rs.
@@ -1419,70 +1315,92 @@ export default function SavingsGoalsScreen() {
 
                     <TextInput
                       value={
-                        moneyAmount
+                        addMoneyAmount
                       }
                       onChangeText={
-                        setMoneyAmount
+                        setAddMoneyAmount
                       }
-                      placeholder="10000"
-                      placeholderTextColor="#A0A9B8"
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
                       keyboardType="numeric"
                       style={
                         styles.input
                       }
                       autoFocus
-                      returnKeyType="done"
                     />
                   </View>
+                </View>
 
-                  <TouchableOpacity
+                <TouchableOpacity
+                  style={
+                    styles.saveButton
+                  }
+                  onPress={
+                    handleAddMoney
+                  }
+                  disabled={
+                    saving
+                  }
+                  activeOpacity={
+                    0.85
+                  }
+                >
+                  {saving ? (
+                    <ActivityIndicator
+                      color={
+                        WHITE
+                      }
+                    />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={
+                          19
+                        }
+                        color={
+                          WHITE
+                        }
+                      />
+
+                      <Text
+                        style={
+                          styles.saveButtonText
+                        }
+                      >
+                        Add to goal
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={
+                    styles.cancelButton
+                  }
+                  onPress={
+                    closeAddMoneyModal
+                  }
+                  activeOpacity={
+                    0.8
+                  }
+                >
+                  <Text
                     style={
-                      styles.primaryButton
-                    }
-                    onPress={
-                      handleAddMoney
-                    }
-                    disabled={
-                      saving
-                    }
-                    activeOpacity={
-                      0.85
+                      styles.cancelButtonText
                     }
                   >
-                    {saving ? (
-                      <ActivityIndicator
-                        color="#FFFFFF"
-                      />
-                    ) : (
-                      <>
-                        <Ionicons
-                          name="wallet-outline"
-                          size={19}
-                          color="#FFFFFF"
-                        />
-
-                        <Text
-                          style={
-                            styles.primaryButtonText
-                          }
-                        >
-                          Add Money
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            </KeyboardAvoidingView>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        )}
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
-
-/* ─────────────────────────────────────────────
-   STYLES
-───────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -1491,71 +1409,52 @@ const styles = StyleSheet.create({
   },
 
   container: {
-    flex: 1,
-  },
-
-  contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: 40,
+    paddingBottom: 45,
   },
 
-  backgroundDecorOne: {
+  backgroundOrbTop: {
     position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
     backgroundColor:
-      "rgba(37,99,235,0.055)",
-    top: -90,
+      "rgba(37,99,235,0.07)",
+    top: -80,
     right: -80,
   },
 
-  backgroundDecorTwo: {
+  backgroundOrbBottom: {
     position: "absolute",
-    width: 170,
-    height: 170,
-    borderRadius: 85,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
     backgroundColor:
-      "rgba(184,138,36,0.045)",
-    bottom: 100,
-    left: -100,
+      "rgba(184,138,36,0.06)",
+    bottom: 80,
+    left: -125,
   },
-
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loadingText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: MUTED,
-    fontWeight: "600",
-  },
-
-  /* HEADER */
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 18,
   },
 
   backButton: {
-    width: 43,
-    height: 43,
+    width: 44,
+    height: 44,
     borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor:
       "rgba(255,255,255,0.72)",
     borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 13,
-    shadowColor: "#64748B",
-    shadowOpacity: 0.08,
+    borderColor:
+      "rgba(255,255,255,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: {
       width: 0,
@@ -1564,308 +1463,330 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  headerText: {
+  headerContent: {
     flex: 1,
+    marginLeft: 13,
   },
 
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  title: {
-    fontSize: 24,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "900",
     color: TEXT,
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
   },
 
-  subtitle: {
-    marginTop: 4,
-    fontSize: 12,
+  headerSubtitle: {
+    marginTop: 3,
+    fontSize: 11.5,
+    lineHeight: 17,
     color: MUTED,
     fontWeight: "500",
   },
 
   proBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     backgroundColor:
-      "rgba(184,138,36,0.10)",
+      "rgba(184,138,36,0.11)",
     borderWidth: 1,
     borderColor:
-      "rgba(184,138,36,0.18)",
+      "rgba(184,138,36,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  proBadgeText: {
-    marginLeft: 4,
-    fontSize: 8,
-    color: GOLD,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-  },
-
-  /* SUMMARY */
-
-  summaryCard: {
+  overviewCard: {
     overflow: "hidden",
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 27,
+    padding: 23,
     backgroundColor:
-      "rgba(255,255,255,0.74)",
+      "rgba(255,255,255,0.78)",
     borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#64748B",
-    shadowOpacity: 0.09,
+    borderColor:
+      "rgba(255,255,255,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.07,
     shadowRadius: 22,
     shadowOffset: {
       width: 0,
-      height: 9,
+      height: 10,
     },
     elevation: 3,
-    marginBottom: 14,
+    marginBottom: 15,
   },
 
-  summaryGlow: {
+  overviewGlow: {
     position: "absolute",
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor:
-      "rgba(37,99,235,0.055)",
-    right: -40,
-    top: -45,
+      "rgba(37,99,235,0.07)",
+    right: -85,
+    top: -85,
   },
 
-  summaryTop: {
+  overviewTopRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    alignItems: "center",
   },
 
-  summaryLabel: {
-    fontSize: 9,
-    color: MUTED,
+  eyebrow: {
+    fontSize: 8,
+    color: GOLD,
     fontWeight: "900",
     letterSpacing: 1.1,
   },
 
-  summaryAmount: {
-    marginTop: 5,
-    fontSize: 29,
+  overviewTitle: {
+    marginTop: 8,
+    fontSize: 31,
     color: TEXT,
     fontWeight: "900",
     letterSpacing: -0.8,
   },
 
-  summaryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 17,
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
-    alignItems: "center",
-    justifyContent: "center",
+  overviewSubtitle: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: MUTED,
+    fontWeight: "600",
   },
 
-  summaryStats: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  overviewIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "rgba(184,138,36,0.10)",
+    borderWidth: 1,
+    borderColor:
+      "rgba(184,138,36,0.17)",
+  },
+
+  overviewProgressTrack: {
+    height: 9,
+    borderRadius: 10,
+    backgroundColor: "#E8EEF7",
+    overflow: "hidden",
     marginTop: 20,
   },
 
-  statLabel: {
-    fontSize: 8,
-    color: MUTED,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-  },
-
-  statValue: {
-    marginTop: 4,
-    fontSize: 13,
-    color: TEXT,
-    fontWeight: "800",
-  },
-
-  summaryProgressTrack: {
-    height: 8,
-    borderRadius: 10,
-    backgroundColor:
-      "rgba(37,99,235,0.08)",
-    marginTop: 18,
-    overflow: "hidden",
-  },
-
-  summaryProgressFill: {
+  overviewProgressFill: {
     height: "100%",
     borderRadius: 10,
     backgroundColor: BLUE,
   },
 
-  /* CREATE BUTTON */
-
-  addGoalButton: {
-    minHeight: 74,
-    borderRadius: 21,
-    backgroundColor: BLUE,
-    paddingHorizontal: 15,
+  overviewBottomRow: {
     flexDirection: "row",
     alignItems: "center",
-    shadowColor: BLUE,
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  overviewProgressText: {
+    fontSize: 9.5,
+    color: BLUE,
+    fontWeight: "800",
+  },
+
+  overviewTargetText: {
+    fontSize: 9.5,
+    color: MUTED,
+    fontWeight: "600",
+  },
+
+  addButton: {
+    minHeight: 74,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor:
+      "rgba(255,255,255,0.72)",
+    borderWidth: 1,
+    borderColor:
+      "rgba(255,255,255,0.95)",
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 7,
     },
-    elevation: 4,
-    marginBottom: 25,
+    elevation: 2,
   },
 
-  addIcon: {
+  addButtonIcon: {
     width: 43,
     height: 43,
-    borderRadius: 15,
-    backgroundColor:
-      "rgba(255,255,255,0.16)",
+    borderRadius: 14,
+    backgroundColor: BLUE,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 12,
   },
 
-  addText: {
+  addButtonContent: {
     flex: 1,
-    marginLeft: 12,
   },
 
-  addTitle: {
-    fontSize: 14,
-    color: "#FFFFFF",
+  addButtonTitle: {
+    fontSize: 13,
+    color: TEXT,
     fontWeight: "900",
   },
 
-  addSubtitle: {
+  addButtonSubtitle: {
     marginTop: 3,
-    fontSize: 10,
-    color: "rgba(255,255,255,0.75)",
+    fontSize: 9.5,
+    color: MUTED,
     fontWeight: "500",
   },
 
-  /* SECTION */
-
   sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
 
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: TEXT,
     fontWeight: "900",
     letterSpacing: -0.3,
   },
 
   sectionSubtitle: {
-    marginTop: 3,
-    fontSize: 11,
+    marginTop: 4,
+    fontSize: 10.5,
     color: MUTED,
+    lineHeight: 16,
     fontWeight: "500",
   },
 
-  /* EMPTY */
+  goalCount: {
+    minWidth: 30,
+    height: 30,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    backgroundColor:
+      "rgba(37,99,235,0.08)",
+    color: BLUE,
+    textAlign: "center",
+    textAlignVertical: "center",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  loadingContainer: {
+    minHeight: 300,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: "600",
+  },
 
   emptyCard: {
     alignItems: "center",
-    padding: 25,
-    borderRadius: 23,
+    paddingHorizontal: 24,
+    paddingVertical: 35,
+    borderRadius: 25,
     backgroundColor:
-      "rgba(255,255,255,0.68)",
+      "rgba(255,255,255,0.72)",
     borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#64748B",
-    shadowOpacity: 0.07,
-    shadowRadius: 18,
+    borderColor:
+      "rgba(255,255,255,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
     shadowOffset: {
       width: 0,
       height: 7,
     },
     elevation: 2,
-    marginBottom: 16,
+    marginBottom: 15,
   },
 
   emptyIcon: {
     width: 58,
     height: 58,
-    borderRadius: 20,
+    borderRadius: 19,
     backgroundColor:
-      "rgba(37,99,235,0.08)",
+      "rgba(37,99,235,0.09)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 13,
   },
 
   emptyTitle: {
-    textAlign: "center",
-    fontSize: 16,
+    fontSize: 15,
     color: TEXT,
     fontWeight: "900",
   },
 
   emptyText: {
-    marginTop: 8,
-    textAlign: "center",
-    fontSize: 11,
-    lineHeight: 18,
+    marginTop: 6,
+    fontSize: 10.5,
+    lineHeight: 17,
     color: MUTED,
+    textAlign: "center",
     fontWeight: "500",
   },
 
   emptyButton: {
-    marginTop: 17,
+    marginTop: 18,
+    minHeight: 42,
     paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 13,
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
+    borderRadius: 14,
+    backgroundColor: BLUE,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyButtonText: {
-    color: BLUE,
-    fontSize: 11,
-    fontWeight: "900",
+    marginLeft: 7,
+    color: WHITE,
+    fontSize: 10.5,
+    fontWeight: "800",
   },
 
-  /* GOAL CARD */
+  goalList: {
+    gap: 13,
+  },
 
   goalCard: {
-    borderRadius: 23,
+    borderRadius: 25,
     padding: 18,
-    marginBottom: 14,
     backgroundColor:
-      "rgba(255,255,255,0.72)",
+      "rgba(255,255,255,0.74)",
     borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#64748B",
-    shadowOpacity: 0.08,
+    borderColor:
+      "rgba(255,255,255,0.95)",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
     shadowRadius: 18,
     shadowOffset: {
       width: 0,
-      height: 7,
+      height: 8,
     },
     elevation: 2,
   },
 
-  completedCard: {
-    borderColor:
-      "rgba(37,99,235,0.18)",
-    backgroundColor:
-      "rgba(248,251,255,0.82)",
-  },
-
-  goalTop: {
+  goalCardTop: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1873,68 +1794,29 @@ const styles = StyleSheet.create({
   goalIcon: {
     width: 43,
     height: 43,
-    borderRadius: 15,
+    borderRadius: 14,
     backgroundColor:
-      "rgba(37,99,235,0.09)",
+      "rgba(37,99,235,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  completedIcon: {
-    backgroundColor: BLUE,
-  },
-
-  goalInfo: {
+  goalHeaderContent: {
     flex: 1,
     marginLeft: 11,
   },
 
-  goalTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
   goalName: {
-    maxWidth: "75%",
-    fontSize: 14,
+    fontSize: 13,
     color: TEXT,
     fontWeight: "900",
   },
 
-  completeBadge: {
-    marginLeft: 7,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor:
-      "rgba(37,99,235,0.09)",
-  },
-
-  completeBadgeText: {
-    fontSize: 7,
-    color: BLUE,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-
-  dateText: {
-    marginLeft: 4,
-    fontSize: 9,
+  goalTarget: {
+    marginTop: 3,
+    fontSize: 9.5,
     color: MUTED,
-    fontWeight: "500",
-  },
-
-  noDateText: {
-    marginTop: 5,
-    fontSize: 9,
-    color: "#9AA4B2",
-    fontWeight: "500",
+    fontWeight: "600",
   },
 
   moreButton: {
@@ -1947,17 +1829,11 @@ const styles = StyleSheet.create({
       "rgba(100,116,139,0.06)",
   },
 
-  /* AMOUNTS */
-
   amountRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
     marginTop: 19,
-  },
-
-  targetAmountContainer: {
+    flexDirection: "row",
     alignItems: "flex-end",
+    justifyContent: "space-between",
   },
 
   savedLabel: {
@@ -1968,28 +1844,34 @@ const styles = StyleSheet.create({
   },
 
   savedAmount: {
-    marginTop: 4,
-    fontSize: 19,
+    marginTop: 3,
+    fontSize: 20,
     color: TEXT,
     fontWeight: "900",
   },
 
-  targetAmount: {
-    marginTop: 4,
-    fontSize: 12,
-    color: MUTED,
-    fontWeight: "800",
-  },
-
-  /* PROGRESS */
-
-  progressTrack: {
-    height: 9,
+  percentageBadge: {
+    paddingHorizontal: 9,
+    minHeight: 28,
     borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor:
       "rgba(37,99,235,0.08)",
-    marginTop: 15,
+  },
+
+  percentageText: {
+    fontSize: 10,
+    color: BLUE,
+    fontWeight: "900",
+  },
+
+  progressTrack: {
+    height: 8,
+    borderRadius: 10,
+    backgroundColor: "#E8EEF7",
     overflow: "hidden",
+    marginTop: 14,
   },
 
   progressFill: {
@@ -1998,112 +1880,104 @@ const styles = StyleSheet.create({
     backgroundColor: BLUE,
   },
 
-  completedProgress: {
-    backgroundColor: BLUE_DARK,
-  },
-
-  progressBottom: {
+  goalBottomRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 7,
-  },
-
-  progressText: {
-    fontSize: 9,
-    color: BLUE,
-    fontWeight: "900",
+    marginTop: 8,
   },
 
   remainingText: {
-    fontSize: 9,
+    fontSize: 9.5,
     color: MUTED,
     fontWeight: "600",
   },
 
-  completedText: {
+  progressSmall: {
     fontSize: 9,
-    color: BLUE,
-    fontWeight: "900",
+    color: MUTED,
+    fontWeight: "700",
   },
-
-  /* ADD MONEY */
 
   addMoneyButton: {
     height: 40,
-    borderRadius: 13,
     marginTop: 14,
+    borderRadius: 13,
     backgroundColor:
       "rgba(37,99,235,0.07)",
     borderWidth: 1,
     borderColor:
-      "rgba(37,99,235,0.10)",
-    flexDirection: "row",
+      "rgba(37,99,235,0.12)",
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
   },
 
   addMoneyText: {
-    marginLeft: 7,
+    marginLeft: 6,
     fontSize: 10,
     color: BLUE,
     fontWeight: "900",
   },
 
-  /* TIP */
-
-  tipCard: {
+  insightCard: {
+    marginTop: 15,
+    borderRadius: 24,
+    padding: 18,
     flexDirection: "row",
-    padding: 16,
-    borderRadius: 19,
     backgroundColor:
-      "rgba(184,138,36,0.07)",
+      "rgba(184,138,36,0.08)",
     borderWidth: 1,
     borderColor:
-      "rgba(184,138,36,0.12)",
-    marginTop: 4,
-    marginBottom: 22,
+      "rgba(184,138,36,0.18)",
   },
 
-  tipIcon: {
-    width: 37,
-    height: 37,
-    borderRadius: 13,
+  insightIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
     backgroundColor:
-      "rgba(184,138,36,0.10)",
+      "rgba(184,138,36,0.12)",
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 13,
   },
 
-  tipContent: {
+  insightContent: {
     flex: 1,
-    marginLeft: 10,
   },
 
-  tipTitle: {
-    fontSize: 10,
+  insightLabel: {
+    fontSize: 8,
     color: GOLD,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  insightTitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: TEXT,
     fontWeight: "900",
   },
 
-  tipText: {
-    marginTop: 4,
-    fontSize: 10,
-    lineHeight: 16,
+  insightDescription: {
+    marginTop: 5,
+    fontSize: 10.5,
+    lineHeight: 17,
     color: MUTED,
     fontWeight: "500",
   },
 
-  /* FOOTER */
-
   footer: {
     alignItems: "center",
-    paddingTop: 4,
-    paddingBottom: 18,
+    marginTop: 25,
   },
 
   footerLogo: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
 
   footerLogoImage: {
@@ -2113,103 +1987,112 @@ const styles = StyleSheet.create({
   },
 
   footerBrand: {
-    fontSize: 12,
-    color: TEXT,
+    fontSize: 14,
     fontWeight: "900",
+    color: TEXT,
+    letterSpacing: 1.5,
   },
 
   footerTagline: {
-    marginTop: 2,
-    fontSize: 8,
+    marginTop: 7,
+    fontSize: 10,
+    color: GOLD,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textAlign: "center",
+  },
+
+  footerSmall: {
+    marginTop: 4,
+    fontSize: 9,
     color: MUTED,
     fontWeight: "500",
+    textAlign: "center",
   },
 
-  footerPro: {
-    marginTop: 7,
-    fontSize: 8,
-    color: GOLD,
-    fontWeight: "800",
-    letterSpacing: 0.4,
+  keyboardWrapper: {
+    flex: 1,
   },
-
-  /* ─────────────────────────────────────────
-     KEYBOARD-AWARE MODALS
-  ───────────────────────────────────────── */
 
   modalOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor:
       "rgba(15,23,42,0.38)",
     justifyContent: "flex-end",
   },
 
-  /*
-   * This wrapper shrinks when the keyboard
-   * appears, allowing the modal to move above it.
-   */
-  keyboardWrapper: {
-    width: "100%",
-    maxHeight: "100%",
-    justifyContent: "flex-end",
-  },
-
   modalCard: {
-    width: "100%",
-    maxHeight: "90%",
-    backgroundColor:
-      "rgba(255,255,255,0.97)",
+    maxHeight: "92%",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 20,
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
+    backgroundColor: WHITE,
+    paddingTop: 10,
   },
 
-  /*
-   * The form itself becomes scrollable when
-   * the keyboard reduces the available height.
-   */
   modalScrollContent: {
-    paddingBottom: 18,
+    paddingHorizontal: 22,
+    paddingBottom: 35,
+  },
+
+  modalHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 5,
+    backgroundColor: "#CBD5E1",
+    alignSelf: "center",
+    marginBottom: 18,
   },
 
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 21,
+    marginBottom: 22,
+  },
+
+  addMoneyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
+  addMoneyModalIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    backgroundColor:
+      "rgba(37,99,235,0.09)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
   },
 
   modalTitle: {
     fontSize: 20,
     color: TEXT,
     fontWeight: "900",
+    letterSpacing: -0.4,
   },
 
   modalSubtitle: {
     marginTop: 4,
-    fontSize: 10,
+    fontSize: 10.5,
     color: MUTED,
     fontWeight: "500",
-    maxWidth: 260,
   },
 
   modalClose: {
-    width: 37,
-    height: 37,
+    width: 38,
+    height: 38,
     borderRadius: 13,
     backgroundColor:
-      "rgba(100,116,139,0.07)",
+      "rgba(100,116,139,0.08)",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  inputGroup: {
+    marginBottom: 17,
   },
 
   inputLabel: {
@@ -2220,95 +2103,96 @@ const styles = StyleSheet.create({
     letterSpacing: 0.9,
   },
 
-  optionalText: {
-    fontSize: 8,
-    color: "#9AA4B2",
-    fontWeight: "600",
-  },
-
-  inputContainer: {
+  inputWrapper: {
     minHeight: 52,
     borderRadius: 15,
-    backgroundColor:
-      "rgba(245,248,252,0.95)",
+    backgroundColor: "#F5F8FC",
     borderWidth: 1,
-    borderColor:
-      "rgba(148,163,184,0.16)",
+    borderColor: "#E2E8F0",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    marginBottom: 15,
+  },
+
+  currencySymbol: {
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: "800",
+    marginRight: 8,
   },
 
   input: {
     flex: 1,
-    marginLeft: 9,
-    fontSize: 14,
+    minHeight: 50,
     color: TEXT,
+    fontSize: 14,
     fontWeight: "700",
     paddingVertical: 0,
   },
 
-  currencyText: {
-    fontSize: 12,
-    color: BLUE,
-    fontWeight: "900",
-  },
-
-  primaryButton: {
-    height: 53,
+  saveButton: {
+    minHeight: 52,
     borderRadius: 16,
     backgroundColor: BLUE,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     marginTop: 5,
-    shadowColor: BLUE,
-    shadowOpacity: 0.20,
-    shadowRadius: 15,
-    shadowOffset: {
-      width: 0,
-      height: 7,
-    },
-    elevation: 3,
   },
 
-  primaryButtonText: {
+  saveButtonText: {
     marginLeft: 7,
-    color: "#FFFFFF",
-    fontSize: 12,
+    color: WHITE,
+    fontSize: 11,
     fontWeight: "900",
   },
 
-  moneyProgressCard: {
-    padding: 16,
-    borderRadius: 17,
+  cancelButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+
+  cancelButtonText: {
+    fontSize: 11,
+    color: MUTED,
+    fontWeight: "800",
+  },
+
+  moneySummary: {
+    minHeight: 82,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     backgroundColor:
-      "rgba(37,99,235,0.07)",
+      "rgba(37,99,235,0.06)",
     borderWidth: 1,
     borderColor:
       "rgba(37,99,235,0.10)",
-    marginBottom: 19,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginBottom: 20,
   },
 
-  moneyProgressLabel: {
-    fontSize: 8,
-    color: BLUE,
+  moneySummaryLabel: {
+    fontSize: 7.5,
+    color: MUTED,
     fontWeight: "900",
     letterSpacing: 0.8,
   },
 
-  moneyProgressAmount: {
-    marginTop: 5,
-    fontSize: 24,
+  moneySummaryValue: {
+    marginTop: 4,
+    fontSize: 13,
     color: TEXT,
     fontWeight: "900",
   },
 
-  moneyProgressTarget: {
-    marginTop: 2,
-    fontSize: 10,
-    color: MUTED,
-    fontWeight: "600",
+  moneySummaryDivider: {
+    width: 1,
+    height: 34,
+    backgroundColor: "#DCE5F2",
   },
 });
