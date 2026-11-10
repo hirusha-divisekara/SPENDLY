@@ -21,33 +21,40 @@ const features = [
   {
     icon: "analytics-outline",
     title: "Advanced Insights",
-    description: "Understand where, when and how you spend.",
+    description:
+      "Understand where, when and how you spend.",
   },
   {
     icon: "trending-up-outline",
     title: "Spending Trends",
-    description: "Track your spending patterns over time.",
+    description:
+      "Track your spending patterns over time.",
     route: "/spending-trends",
   },
   {
     icon: "flag-outline",
     title: "Savings Goals",
-    description: "Set goals and stay focused on your financial future.",
+    description:
+      "Set goals and stay focused on your financial future.",
+    route: "/savings-goals",
   },
   {
     icon: "repeat-outline",
     title: "Recurring Expenses",
-    description: "Keep track of regular monthly expenses.",
+    description:
+      "Keep track of regular monthly expenses.",
   },
   {
     icon: "pricetags-outline",
     title: "Custom Categories",
-    description: "Organize your spending your way.",
+    description:
+      "Organize your spending your way.",
   },
   {
     icon: "download-outline",
     title: "Reports & Export",
-    description: "Export your financial data for deeper analysis.",
+    description:
+      "Export your financial data for deeper analysis.",
   },
 ];
 
@@ -60,7 +67,9 @@ export default function ProScreen() {
     // Real App Store / Google Play restore logic will be added later.
   };
 
-  const handleFeaturePress = (feature: (typeof features)[number]) => {
+  const handleFeaturePress = (
+    feature: (typeof features)[number]
+  ) => {
     if (feature.route) {
       router.push(feature.route as any);
     }
@@ -76,6 +85,7 @@ export default function ProScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
+
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -109,6 +119,7 @@ export default function ProScreen() {
         </View>
 
         {/* Hero */}
+
         <View style={styles.heroCard}>
           <View style={styles.heroGlow} />
 
@@ -145,6 +156,7 @@ export default function ProScreen() {
         </View>
 
         {/* Pricing */}
+
         <View style={styles.pricingCard}>
           <View style={styles.bestValue}>
             <Ionicons
@@ -198,6 +210,7 @@ export default function ProScreen() {
         </View>
 
         {/* Features */}
+
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>
@@ -212,17 +225,23 @@ export default function ProScreen() {
 
         <View style={styles.featuresGrid}>
           {features.map((feature) => {
-            const isAvailable = Boolean(feature.route);
+            const isAvailable =
+              Boolean(feature.route);
 
             return (
               <TouchableOpacity
                 key={feature.title}
                 style={[
                   styles.featureCard,
-                  isAvailable && styles.featureCardInteractive,
+                  isAvailable &&
+                    styles.featureCardInteractive,
                 ]}
-                activeOpacity={isAvailable ? 0.75 : 1}
-                onPress={() => handleFeaturePress(feature)}
+                activeOpacity={
+                  isAvailable ? 0.75 : 1
+                }
+                onPress={() =>
+                  handleFeaturePress(feature)
+                }
                 disabled={!isAvailable}
               >
                 <View style={styles.featureTopRow}>
@@ -235,7 +254,11 @@ export default function ProScreen() {
                   </View>
 
                   {isAvailable && (
-                    <View style={styles.availableBadge}>
+                    <View
+                      style={
+                        styles.availableBadge
+                      }
+                    >
                       <Ionicons
                         name="arrow-forward"
                         size={12}
@@ -249,12 +272,18 @@ export default function ProScreen() {
                   {feature.title}
                 </Text>
 
-                <Text style={styles.featureDescription}>
+                <Text
+                  style={
+                    styles.featureDescription
+                  }
+                >
                   {feature.description}
                 </Text>
 
                 {isAvailable && (
-                  <Text style={styles.exploreText}>
+                  <Text
+                    style={styles.exploreText}
+                  >
                     Explore →
                   </Text>
                 )}
@@ -264,6 +293,7 @@ export default function ProScreen() {
         </View>
 
         {/* Premium Insight */}
+
         <View style={styles.insightCard}>
           <View style={styles.insightIcon}>
             <Ionicons
@@ -282,7 +312,9 @@ export default function ProScreen() {
               See the bigger picture.
             </Text>
 
-            <Text style={styles.insightDescription}>
+            <Text
+              style={styles.insightDescription}
+            >
               Go beyond individual expenses and discover
               the patterns behind your financial habits.
             </Text>
@@ -290,6 +322,7 @@ export default function ProScreen() {
         </View>
 
         {/* Restore Purchase */}
+
         <TouchableOpacity
           style={styles.restoreButton}
           onPress={handleRestore}
@@ -307,6 +340,7 @@ export default function ProScreen() {
         </TouchableOpacity>
 
         {/* Footer */}
+
         <View style={styles.footer}>
           <View style={styles.footerLogo}>
             <Image
@@ -346,12 +380,14 @@ const styles = StyleSheet.create({
   },
 
   /* Background */
+
   backgroundOrbTop: {
     position: "absolute",
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: "rgba(37, 99, 235, 0.07)",
+    backgroundColor:
+      "rgba(37, 99, 235, 0.07)",
     top: -80,
     right: -70,
   },
@@ -361,12 +397,14 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: "rgba(184, 138, 36, 0.06)",
+    backgroundColor:
+      "rgba(184, 138, 36, 0.06)",
     bottom: 80,
     left: -120,
   },
 
   /* Header */
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -379,9 +417,11 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor:
+      "rgba(255,255,255,0.72)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.95)",
+    borderColor:
+      "rgba(255,255,255,0.95)",
     shadowColor: "#0F172A",
     shadowOpacity: 0.06,
     shadowRadius: 12,
@@ -415,21 +455,26 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: "rgba(184,138,36,0.11)",
+    backgroundColor:
+      "rgba(184,138,36,0.11)",
     borderWidth: 1,
-    borderColor: "rgba(184,138,36,0.22)",
+    borderColor:
+      "rgba(184,138,36,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
 
   /* Hero */
+
   heroCard: {
     overflow: "hidden",
     borderRadius: 30,
     padding: 25,
-    backgroundColor: "rgba(255,255,255,0.76)",
+    backgroundColor:
+      "rgba(255,255,255,0.76)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.95)",
+    borderColor:
+      "rgba(255,255,255,0.95)",
     shadowColor: "#0F172A",
     shadowOpacity: 0.08,
     shadowRadius: 25,
@@ -446,7 +491,8 @@ const styles = StyleSheet.create({
     width: 190,
     height: 190,
     borderRadius: 95,
-    backgroundColor: "rgba(37,99,235,0.08)",
+    backgroundColor:
+      "rgba(37,99,235,0.08)",
     right: -80,
     top: -80,
   },
@@ -457,9 +503,11 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(184,138,36,0.12)",
+    backgroundColor:
+      "rgba(184,138,36,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(184,138,36,0.22)",
+    borderColor:
+      "rgba(184,138,36,0.22)",
     marginBottom: 18,
   },
 
@@ -492,7 +540,8 @@ const styles = StyleSheet.create({
   taglineLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(184,138,36,0.25)",
+    backgroundColor:
+      "rgba(184,138,36,0.25)",
   },
 
   tagline: {
@@ -504,12 +553,15 @@ const styles = StyleSheet.create({
   },
 
   /* Pricing */
+
   pricingCard: {
     borderRadius: 26,
     padding: 23,
-    backgroundColor: "rgba(37,99,235,0.94)",
+    backgroundColor:
+      "rgba(37,99,235,0.94)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
+    borderColor:
+      "rgba(255,255,255,0.25)",
     shadowColor: BLUE,
     shadowOpacity: 0.20,
     shadowRadius: 22,
@@ -529,9 +581,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.13)",
+    backgroundColor:
+      "rgba(255,255,255,0.13)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor:
+      "rgba(255,255,255,0.18)",
     marginBottom: 14,
   },
 
@@ -552,13 +606,15 @@ const styles = StyleSheet.create({
   pricePeriod: {
     marginTop: -3,
     fontSize: 12,
-    color: "rgba(255,255,255,0.75)",
+    color:
+      "rgba(255,255,255,0.75)",
     fontWeight: "600",
   },
 
   pricingDescription: {
     marginTop: 12,
-    color: "rgba(255,255,255,0.86)",
+    color:
+      "rgba(255,255,255,0.86)",
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "500",
@@ -585,11 +641,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 11,
     fontSize: 9,
-    color: "rgba(255,255,255,0.58)",
+    color:
+      "rgba(255,255,255,0.58)",
     fontWeight: "500",
   },
 
   /* Sections */
+
   sectionHeader: {
     marginBottom: 15,
   },
@@ -610,6 +668,7 @@ const styles = StyleSheet.create({
   },
 
   /* Features */
+
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -622,9 +681,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 16,
     borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.72)",
+    backgroundColor:
+      "rgba(255,255,255,0.72)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.95)",
+    borderColor:
+      "rgba(255,255,255,0.95)",
     shadowColor: "#0F172A",
     shadowOpacity: 0.05,
     shadowRadius: 15,
@@ -636,7 +697,8 @@ const styles = StyleSheet.create({
   },
 
   featureCardInteractive: {
-    borderColor: "rgba(37,99,235,0.22)",
+    borderColor:
+      "rgba(37,99,235,0.22)",
     shadowColor: BLUE,
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -656,9 +718,11 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: "rgba(37,99,235,0.09)",
+    backgroundColor:
+      "rgba(37,99,235,0.09)",
     borderWidth: 1,
-    borderColor: "rgba(37,99,235,0.12)",
+    borderColor:
+      "rgba(37,99,235,0.12)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 13,
@@ -670,9 +734,11 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(37,99,235,0.08)",
+    backgroundColor:
+      "rgba(37,99,235,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(37,99,235,0.13)",
+    borderColor:
+      "rgba(37,99,235,0.13)",
   },
 
   featureTitle: {
@@ -698,21 +764,25 @@ const styles = StyleSheet.create({
   },
 
   /* Premium Insight */
+
   insightCard: {
     marginTop: 5,
     borderRadius: 24,
     padding: 18,
     flexDirection: "row",
-    backgroundColor: "rgba(184,138,36,0.08)",
+    backgroundColor:
+      "rgba(184,138,36,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(184,138,36,0.18)",
+    borderColor:
+      "rgba(184,138,36,0.18)",
   },
 
   insightIcon: {
     width: 43,
     height: 43,
     borderRadius: 14,
-    backgroundColor: "rgba(184,138,36,0.12)",
+    backgroundColor:
+      "rgba(184,138,36,0.12)",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 13,
@@ -745,6 +815,7 @@ const styles = StyleSheet.create({
   },
 
   /* Restore */
+
   restoreButton: {
     alignSelf: "center",
     flexDirection: "row",
@@ -760,6 +831,7 @@ const styles = StyleSheet.create({
   },
 
   /* Footer */
+
   footer: {
     alignItems: "center",
     marginTop: 10,
