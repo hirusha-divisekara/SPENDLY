@@ -17,13 +17,21 @@ const TEXT = "#0F172A";
 const MUTED = "#64748B";
 const WHITE = "#FFFFFF";
 
-const features = [
+type Feature = {
+  icon: string;
+  title: string;
+  description: string;
+  route?: string;
+};
+
+const features: Feature[] = [
   {
     icon: "analytics-outline",
     title: "Advanced Insights",
     description:
       "Understand where, when and how you spend.",
   },
+
   {
     icon: "trending-up-outline",
     title: "Spending Trends",
@@ -31,6 +39,7 @@ const features = [
       "Track your spending patterns over time.",
     route: "/spending-trends",
   },
+
   {
     icon: "flag-outline",
     title: "Savings Goals",
@@ -38,18 +47,23 @@ const features = [
       "Set goals and stay focused on your financial future.",
     route: "/savings-goals",
   },
+
   {
     icon: "repeat-outline",
     title: "Recurring Expenses",
     description:
-      "Keep track of regular monthly expenses.",
+      "Keep track of bills, subscriptions and regular payments.",
+    route: "/recurring-expenses",
   },
+
   {
     icon: "pricetags-outline",
     title: "Custom Categories",
     description:
-      "Organize your spending your way.",
+      "Create and manage categories that fit your spending.",
+    route: "/custom-categories",
   },
+
   {
     icon: "download-outline",
     title: "Reports & Export",
@@ -64,19 +78,21 @@ export default function ProScreen() {
   };
 
   const handleRestore = () => {
-    // Real App Store / Google Play restore logic will be added later.
+    // Real App Store / Google Play restore logic
+    // will be added later.
   };
 
-  const handleFeaturePress = (
-    feature: (typeof features)[number]
-  ) => {
-    if (feature.route) {
-      router.push(feature.route as any);
+  const handleFeaturePress = (feature: Feature) => {
+    if (!feature.route) {
+      return;
     }
+
+    router.push(feature.route as any);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Background decoration */}
       <View style={styles.backgroundOrbTop} />
       <View style={styles.backgroundOrbBottom} />
 
@@ -85,7 +101,6 @@ export default function ProScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -119,7 +134,6 @@ export default function ProScreen() {
         </View>
 
         {/* Hero */}
-
         <View style={styles.heroCard}>
           <View style={styles.heroGlow} />
 
@@ -156,7 +170,6 @@ export default function ProScreen() {
         </View>
 
         {/* Pricing */}
-
         <View style={styles.pricingCard}>
           <View style={styles.bestValue}>
             <Ionicons
@@ -210,7 +223,6 @@ export default function ProScreen() {
         </View>
 
         {/* Features */}
-
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>
@@ -225,8 +237,7 @@ export default function ProScreen() {
 
         <View style={styles.featuresGrid}>
           {features.map((feature) => {
-            const isAvailable =
-              Boolean(feature.route);
+            const isAvailable = Boolean(feature.route);
 
             return (
               <TouchableOpacity
@@ -254,11 +265,7 @@ export default function ProScreen() {
                   </View>
 
                   {isAvailable && (
-                    <View
-                      style={
-                        styles.availableBadge
-                      }
-                    >
+                    <View style={styles.availableBadge}>
                       <Ionicons
                         name="arrow-forward"
                         size={12}
@@ -272,18 +279,12 @@ export default function ProScreen() {
                   {feature.title}
                 </Text>
 
-                <Text
-                  style={
-                    styles.featureDescription
-                  }
-                >
+                <Text style={styles.featureDescription}>
                   {feature.description}
                 </Text>
 
                 {isAvailable && (
-                  <Text
-                    style={styles.exploreText}
-                  >
+                  <Text style={styles.exploreText}>
                     Explore →
                   </Text>
                 )}
@@ -293,7 +294,6 @@ export default function ProScreen() {
         </View>
 
         {/* Premium Insight */}
-
         <View style={styles.insightCard}>
           <View style={styles.insightIcon}>
             <Ionicons
@@ -312,9 +312,7 @@ export default function ProScreen() {
               See the bigger picture.
             </Text>
 
-            <Text
-              style={styles.insightDescription}
-            >
+            <Text style={styles.insightDescription}>
               Go beyond individual expenses and discover
               the patterns behind your financial habits.
             </Text>
@@ -322,7 +320,6 @@ export default function ProScreen() {
         </View>
 
         {/* Restore Purchase */}
-
         <TouchableOpacity
           style={styles.restoreButton}
           onPress={handleRestore}
@@ -340,7 +337,6 @@ export default function ProScreen() {
         </TouchableOpacity>
 
         {/* Footer */}
-
         <View style={styles.footer}>
           <View style={styles.footerLogo}>
             <Image

@@ -4,18 +4,13 @@
     "slug": "spendly",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/icon.png",
-
     "scheme": "spendly",
-
     "userInterfaceStyle": "dark",
-
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/icon.png"
     },
-
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0B1B3B",
@@ -24,12 +19,10 @@
       },
       "predictiveBackGestureEnabled": false
     },
-
     "web": {
       "output": "server",
       "favicon": "./assets/icon.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -41,9 +34,9 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-sharing"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

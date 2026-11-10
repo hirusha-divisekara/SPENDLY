@@ -1,9 +1,5 @@
 import * as SQLite from "expo-sqlite";
 
-/* ─────────────────────────────────────────────
-   TYPES
-───────────────────────────────────────────── */
-
 export type Expense = {
   id: number;
   amount: number;
@@ -24,33 +20,41 @@ export type SavingsGoal = {
   name: string;
   target_amount: number;
   saved_amount: number;
-  target_date: string;
+  deadline: string;
+  icon: string;
   created_at: string;
 };
 
-/* ─────────────────────────────────────────────
-   DATABASE INSTANCE
-───────────────────────────────────────────── */
+export type RecurringExpense = {
+  id: number;
+  amount: number;
+  category: string;
+  note: string;
+  frequency: string;
+  next_date: string;
+  active: number;
+  created_at: string;
+};
+
+export type CustomCategory = {
+  id: number;
+  name: string;
+  icon: string;
+  created_at: string;
+};
 
 let db: SQLite.SQLiteDatabase | null = null;
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-/* ─────────────────────────────────────────────
-   DATABASE INITIALIZATION
-───────────────────────────────────────────── */
+/* ========================================================= */
+/* DATABASE INITIALIZATION */
+/* ========================================================= */
 
 export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  // Already initialized
-  if (db) {
-    return Promise.resolve(db);
-  }
+  if (db) return Promise.resolve(db);
 
-  // Initialization already in progress
-  if (dbPromise) {
-    return dbPromise;
-  }
+  if (dbPromise) return dbPromise;
 
-  // Start initialization once
   dbPromise = (async () => {
     try {
       const database =
@@ -78,7 +82,26 @@ export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
           name TEXT NOT NULL,
           target_amount REAL NOT NULL,
           saved_amount REAL NOT NULL DEFAULT 0,
-          target_date TEXT DEFAULT '',
+          deadline TEXT NOT NULL,
+          icon TEXT NOT NULL DEFAULT 'flag-outline',
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS recurring_expenses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          amount REAL NOT NULL,
+          category TEXT NOT NULL,
+          note TEXT DEFAULT '',
+          frequency TEXT NOT NULL,
+          next_date TEXT NOT NULL,
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS custom_categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          icon TEXT NOT NULL DEFAULT 'wallet-outline',
           created_at TEXT NOT NULL
         );
       `);
@@ -94,8 +117,6 @@ export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
         error
       );
 
-      // Allow initialization to be retried
-      // if something fails.
       dbPromise = null;
 
       throw error;
@@ -105,9 +126,9 @@ export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   return dbPromise;
 }
 
-/* ─────────────────────────────────────────────
-   EXPENSES
-───────────────────────────────────────────── */
+/* ========================================================= */
+/* EXPENSES */
+/* ========================================================= */
 
 export async function addExpense(
   amount: number,
@@ -116,42 +137,45 @@ export async function addExpense(
 ) {
   const database = await getDatabase();
 
-  const result = await database.runAsync(
-    `
-      INSERT INTO expenses
-        (amount, category, note, date)
-      VALUES
-        (?, ?, ?, ?)
-    `,
-    amount,
-    category,
-    note,
-    new Date().toISOString()
-  );
+  const result =
+    await database.runAsync(
+      `
+        INSERT INTO expenses
+          (amount, category, note, date)
+        VALUES
+          (?, ?, ?, ?)
+      `,
+      amount,
+      category,
+      note,
+      new Date().toISOString()
+    );
 
-  console.log("✅ EXPENSE INSERTED:", {
-    id: result.lastInsertRowId,
-    amount,
-    category,
-    note,
-  });
+  console.log(
+    "✅ EXPENSE INSERTED:",
+    {
+      id: result.lastInsertRowId,
+      amount,
+      category,
+      note,
+    }
+  );
 
   return result.lastInsertRowId;
 }
 
-export async function getExpenses(): Promise<Expense[]> {
+export async function getExpenses(): Promise<
+  Expense[]
+> {
   const database = await getDatabase();
 
-  const expenses =
-    await database.getAllAsync<Expense>(
-      `
-        SELECT *
-        FROM expenses
-        ORDER BY date DESC
-      `
-    );
-
-  return expenses;
+  return await database.getAllAsync<Expense>(
+    `
+      SELECT *
+      FROM expenses
+      ORDER BY date DESC
+    `
+  );
 }
 
 export async function getExpenseById(
@@ -195,12 +219,15 @@ export async function updateExpense(
     id
   );
 
-  console.log("✏️ EXPENSE UPDATED:", {
-    id,
-    amount,
-    category,
-    note,
-  });
+  console.log(
+    "✏️ EXPENSE UPDATED:",
+    {
+      id,
+      amount,
+      category,
+      note,
+    }
+  );
 }
 
 export async function deleteExpense(
@@ -222,9 +249,9 @@ export async function deleteExpense(
   );
 }
 
-/* ─────────────────────────────────────────────
-   BUDGETS
-───────────────────────────────────────────── */
+/* ========================================================= */
+/* BUDGETS */
+/* ========================================================= */
 
 export async function addBudget(
   category: string,
@@ -253,10 +280,6 @@ export async function addBudget(
       month
     );
 
-  /*
-   * If a budget already exists for the
-   * same category and month, update it.
-   */
   if (existing) {
     await database.runAsync(
       `
@@ -307,7 +330,9 @@ export async function addBudget(
   return result.lastInsertRowId;
 }
 
-export async function getBudgets(): Promise<Budget[]> {
+export async function getBudgets(): Promise<
+  Budget[]
+> {
   const database = await getDatabase();
 
   const month = new Date()
@@ -352,14 +377,15 @@ export async function deleteBudget(
   );
 }
 
-/* ─────────────────────────────────────────────
-   SAVINGS GOALS
-───────────────────────────────────────────── */
+/* ========================================================= */
+/* SAVINGS GOALS */
+/* ========================================================= */
 
 export async function addSavingsGoal(
   name: string,
   targetAmount: number,
-  targetDate: string = ""
+  deadline: string,
+  icon: string
 ) {
   const database = await getDatabase();
 
@@ -371,49 +397,46 @@ export async function addSavingsGoal(
             name,
             target_amount,
             saved_amount,
-            target_date,
+            deadline,
+            icon,
             created_at
           )
         VALUES
-          (?, ?, 0, ?, ?)
+          (?, ?, 0, ?, ?, ?)
       `,
-      name,
+      name.trim(),
       targetAmount,
-      targetDate,
+      deadline,
+      icon,
       new Date().toISOString()
     );
 
   console.log(
-    "🎯 SAVINGS GOAL CREATED:",
+    "🎯 SAVINGS GOAL ADDED:",
     {
       id: result.lastInsertRowId,
       name,
       targetAmount,
-      targetDate,
+      deadline,
+      icon,
     }
   );
 
   return result.lastInsertRowId;
 }
 
-export async function getSavingsGoals(): Promise<SavingsGoal[]> {
+export async function getSavingsGoals(): Promise<
+  SavingsGoal[]
+> {
   const database = await getDatabase();
 
-  const goals =
-    await database.getAllAsync<SavingsGoal>(
-      `
-        SELECT *
-        FROM savings_goals
-        ORDER BY id DESC
-      `
-    );
-
-  console.log(
-    "🎯 SAVINGS GOALS LOADED:",
-    goals
+  return await database.getAllAsync<SavingsGoal>(
+    `
+      SELECT *
+      FROM savings_goals
+      ORDER BY created_at DESC
+    `
   );
-
-  return goals;
 }
 
 export async function getSavingsGoalById(
@@ -421,7 +444,7 @@ export async function getSavingsGoalById(
 ): Promise<SavingsGoal | null> {
   const database = await getDatabase();
 
-  const goal =
+  const result =
     await database.getFirstAsync<SavingsGoal>(
       `
         SELECT *
@@ -431,14 +454,15 @@ export async function getSavingsGoalById(
       id
     );
 
-  return goal ?? null;
+  return result ?? null;
 }
 
 export async function updateSavingsGoal(
   id: number,
   name: string,
   targetAmount: number,
-  targetDate: string
+  deadline: string,
+  icon: string
 ) {
   const database = await getDatabase();
 
@@ -448,12 +472,14 @@ export async function updateSavingsGoal(
       SET
         name = ?,
         target_amount = ?,
-        target_date = ?
+        deadline = ?,
+        icon = ?
       WHERE id = ?
     `,
-    name,
+    name.trim(),
     targetAmount,
-    targetDate,
+    deadline,
+    icon,
     id
   );
 
@@ -463,7 +489,8 @@ export async function updateSavingsGoal(
       id,
       name,
       targetAmount,
-      targetDate,
+      deadline,
+      icon,
     }
   );
 }
@@ -474,28 +501,14 @@ export async function updateSavingsGoalAmount(
 ) {
   const database = await getDatabase();
 
-  /*
-   * Prevent negative saved amounts.
-   */
-  const safeAmount =
-    Math.max(0, savedAmount);
-
   await database.runAsync(
     `
       UPDATE savings_goals
       SET saved_amount = ?
       WHERE id = ?
     `,
-    safeAmount,
+    savedAmount,
     id
-  );
-
-  console.log(
-    "💰 SAVINGS GOAL AMOUNT UPDATED:",
-    {
-      id,
-      savedAmount: safeAmount,
-    }
   );
 }
 
@@ -505,21 +518,8 @@ export async function addToSavingsGoal(
 ) {
   const database = await getDatabase();
 
-  if (amount <= 0) {
-    throw new Error(
-      "Savings amount must be greater than zero."
-    );
-  }
-
   const goal =
-    await database.getFirstAsync<SavingsGoal>(
-      `
-        SELECT *
-        FROM savings_goals
-        WHERE id = ?
-      `,
-      id
-    );
+    await getSavingsGoalById(id);
 
   if (!goal) {
     throw new Error(
@@ -527,7 +527,7 @@ export async function addToSavingsGoal(
     );
   }
 
-  const newSavedAmount =
+  const newAmount =
     goal.saved_amount + amount;
 
   await database.runAsync(
@@ -536,20 +536,18 @@ export async function addToSavingsGoal(
       SET saved_amount = ?
       WHERE id = ?
     `,
-    newSavedAmount,
+    newAmount,
     id
   );
 
   console.log(
-    "💵 MONEY ADDED TO SAVINGS GOAL:",
+    "💰 MONEY ADDED TO GOAL:",
     {
       id,
-      addedAmount: amount,
-      newSavedAmount,
+      amount,
+      newAmount,
     }
   );
-
-  return newSavedAmount;
 }
 
 export async function deleteSavingsGoal(
@@ -567,6 +565,305 @@ export async function deleteSavingsGoal(
 
   console.log(
     "🗑️ SAVINGS GOAL DELETED:",
+    id
+  );
+}
+
+/* ========================================================= */
+/* RECURRING EXPENSES */
+/* ========================================================= */
+
+export async function addRecurringExpense(
+  amount: number,
+  category: string,
+  note: string,
+  frequency: string,
+  nextDate: string
+) {
+  const database = await getDatabase();
+
+  const result =
+    await database.runAsync(
+      `
+        INSERT INTO recurring_expenses
+          (
+            amount,
+            category,
+            note,
+            frequency,
+            next_date,
+            active,
+            created_at
+          )
+        VALUES
+          (?, ?, ?, ?, ?, 1, ?)
+      `,
+      amount,
+      category,
+      note.trim(),
+      frequency,
+      nextDate,
+      new Date().toISOString()
+    );
+
+  console.log(
+    "🔁 RECURRING EXPENSE ADDED:",
+    {
+      id: result.lastInsertRowId,
+      amount,
+      category,
+      frequency,
+      nextDate,
+    }
+  );
+
+  return result.lastInsertRowId;
+}
+
+export async function getRecurringExpenses(): Promise<
+  RecurringExpense[]
+> {
+  const database = await getDatabase();
+
+  return await database.getAllAsync<RecurringExpense>(
+    `
+      SELECT *
+      FROM recurring_expenses
+      ORDER BY next_date ASC
+    `
+  );
+}
+
+export async function getRecurringExpenseById(
+  id: number
+): Promise<RecurringExpense | null> {
+  const database = await getDatabase();
+
+  const result =
+    await database.getFirstAsync<RecurringExpense>(
+      `
+        SELECT *
+        FROM recurring_expenses
+        WHERE id = ?
+      `,
+      id
+    );
+
+  return result ?? null;
+}
+
+export async function updateRecurringExpense(
+  id: number,
+  amount: number,
+  category: string,
+  note: string,
+  frequency: string,
+  nextDate: string
+) {
+  const database = await getDatabase();
+
+  await database.runAsync(
+    `
+      UPDATE recurring_expenses
+      SET
+        amount = ?,
+        category = ?,
+        note = ?,
+        frequency = ?,
+        next_date = ?
+      WHERE id = ?
+    `,
+    amount,
+    category,
+    note.trim(),
+    frequency,
+    nextDate,
+    id
+  );
+
+  console.log(
+    "✏️ RECURRING EXPENSE UPDATED:",
+    id
+  );
+}
+
+export async function toggleRecurringExpense(
+  id: number,
+  active: number
+) {
+  const database = await getDatabase();
+
+  await database.runAsync(
+    `
+      UPDATE recurring_expenses
+      SET active = ?
+      WHERE id = ?
+    `,
+    active,
+    id
+  );
+
+  console.log(
+    active
+      ? "▶️ RECURRING EXPENSE RESUMED:"
+      : "⏸️ RECURRING EXPENSE PAUSED:",
+    id
+  );
+}
+
+export async function deleteRecurringExpense(
+  id: number
+) {
+  const database = await getDatabase();
+
+  await database.runAsync(
+    `
+      DELETE FROM recurring_expenses
+      WHERE id = ?
+    `,
+    id
+  );
+
+  console.log(
+    "🗑️ RECURRING EXPENSE DELETED:",
+    id
+  );
+}
+
+/* ========================================================= */
+/* CUSTOM CATEGORIES */
+/* ========================================================= */
+
+export async function addCustomCategory(
+  name: string,
+  icon: string
+) {
+  const database = await getDatabase();
+
+  const cleanName =
+    name.trim();
+
+  if (!cleanName) {
+    throw new Error(
+      "Category name is required."
+    );
+  }
+
+  const result =
+    await database.runAsync(
+      `
+        INSERT INTO custom_categories
+          (
+            name,
+            icon,
+            created_at
+          )
+        VALUES
+          (?, ?, ?)
+      `,
+      cleanName,
+      icon,
+      new Date().toISOString()
+    );
+
+  console.log(
+    "🏷️ CUSTOM CATEGORY ADDED:",
+    {
+      id: result.lastInsertRowId,
+      name: cleanName,
+      icon,
+    }
+  );
+
+  return result.lastInsertRowId;
+}
+
+export async function getCustomCategories(): Promise<
+  CustomCategory[]
+> {
+  const database = await getDatabase();
+
+  return await database.getAllAsync<CustomCategory>(
+    `
+      SELECT *
+      FROM custom_categories
+      ORDER BY name COLLATE NOCASE ASC
+    `
+  );
+}
+
+export async function getCustomCategoryById(
+  id: number
+): Promise<CustomCategory | null> {
+  const database = await getDatabase();
+
+  const result =
+    await database.getFirstAsync<CustomCategory>(
+      `
+        SELECT *
+        FROM custom_categories
+        WHERE id = ?
+      `,
+      id
+    );
+
+  return result ?? null;
+}
+
+export async function updateCustomCategory(
+  id: number,
+  name: string,
+  icon: string
+) {
+  const database = await getDatabase();
+
+  const cleanName =
+    name.trim();
+
+  if (!cleanName) {
+    throw new Error(
+      "Category name is required."
+    );
+  }
+
+  await database.runAsync(
+    `
+      UPDATE custom_categories
+      SET
+        name = ?,
+        icon = ?
+      WHERE id = ?
+    `,
+    cleanName,
+    icon,
+    id
+  );
+
+  console.log(
+    "✏️ CUSTOM CATEGORY UPDATED:",
+    {
+      id,
+      name: cleanName,
+      icon,
+    }
+  );
+}
+
+export async function deleteCustomCategory(
+  id: number
+) {
+  const database = await getDatabase();
+
+  await database.runAsync(
+    `
+      DELETE FROM custom_categories
+      WHERE id = ?
+    `,
+    id
+  );
+
+  console.log(
+    "🗑️ CUSTOM CATEGORY DELETED:",
     id
   );
 }
