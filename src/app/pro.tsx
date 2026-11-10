@@ -30,7 +30,7 @@ const features: Feature[] = [
     title: "Advanced Insights",
     description:
       "Understand where, when and how you spend.",
-    // Coming in the next Pro update
+    route: "/advanced-insights",
   },
 
   {
